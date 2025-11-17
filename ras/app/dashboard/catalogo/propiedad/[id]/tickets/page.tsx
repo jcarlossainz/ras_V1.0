@@ -1,419 +1,765 @@
-'use client';
+'use client'
 
 /**
- * Página de Calendario de Pagos
- * Plan C - Diseño consistente con el sistema RAS
- * Consultas directas a Supabase sin dependencias externas
+ * TICKETS DE PROPIEDAD
+ * Sistema completo de tickets/tareas para una propiedad específica
+ * Maneja tanto pagos de servicios como tareas manuales
  */
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
-import { useToast } from '@/hooks/useToast';
-import TopBar from '@/components/ui/topbar';
-import Loading from '@/components/ui/loading';
-import EmptyState from '@/components/ui/emptystate';
+import { useEffect, useState, useCallback } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase/client'
+import { useToast } from '@/hooks/useToast'
+import { useAuth } from '@/hooks/useAuth'
+import { useConfirm } from '@/components/ui/confirm-modal'
+import TopBar from '@/components/ui/topbar'
+import Loading from '@/components/ui/loading'
+import EmptyState from '@/components/ui/emptystate'
+import type { Ticket, TipoTicket, EstadoTicket, PrioridadTicket } from '@/types/ticket'
+import { logger } from '@/lib/logger'
 
-interface Propiedad {
-  id: string;
-  nombre: string;
+interface PropiedadInfo {
+  id: string
+  nombre: string
 }
 
-interface Pago {
-  id: string;
-  fecha_pago: string;
-  monto_estimado: number;
-  pagado: boolean;
-  servicio: {
-    nombre: string;
-    tipo_servicio: string;
-    numero_contrato: string;
-  };
-}
+export default function TicketsPropiedad() {
+  const params = useParams()
+  const router = useRouter()
+  const toast = useToast()
+  const confirm = useConfirm()
+  const { user, loading: authLoading, isAuthenticated } = useAuth()
+  const propiedadId = params?.id as string
 
-export default function CalendarioPagosPage() {
-  const params = useParams();
-  const router = useRouter();
-  const toast = useToast();
-  const propiedadId = params?.id as string;
+  const [loading, setLoading] = useState(true)
+  const [propiedad, setPropiedad] = useState<PropiedadInfo | null>(null)
+  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [ticketsFiltrados, setTicketsFiltrados] = useState<Ticket[]>([])
 
-  const [loading, setLoading] = useState(true);
-  const [propiedad, setPropiedad] = useState<Propiedad | null>(null);
-  const [pagos, setPagos] = useState<Pago[]>([]);
-  const [filtro, setFiltro] = useState<'todos' | 'vencido' | 'hoy' | 'proximo'>('todos');
+  // Filtros
+  const [filtroEstado, setFiltroEstado] = useState<EstadoTicket | 'todos'>('todos')
+  const [filtroTipo, setFiltroTipo] = useState<TipoTicket | 'todos'>('todos')
+  const [busqueda, setBusqueda] = useState('')
 
+  // Modal nuevo ticket
+  const [showNuevoTicket, setShowNuevoTicket] = useState(false)
+  const [ticketEditando, setTicketEditando] = useState<Ticket | null>(null)
+
+  // Form data
+  const [formData, setFormData] = useState({
+    titulo: '',
+    descripcion: '',
+    tipo_ticket: 'otro' as TipoTicket,
+    prioridad: 'media' as PrioridadTicket,
+    responsable: '',
+    proveedor: '',
+    fecha_programada: new Date().toISOString().split('T')[0],
+    monto_estimado: '',
+    estado: 'pendiente' as EstadoTicket
+  })
+  const [submitting, setSubmitting] = useState(false)
+
+  // Cargar datos cuando el usuario está autenticado
   useEffect(() => {
-    if (propiedadId) {
-      cargarDatos();
+    if (isAuthenticated && user && propiedadId) {
+      cargarDatos()
     }
-  }, [propiedadId]);
+  }, [isAuthenticated, user, propiedadId])
 
-  const cargarDatos = async () => {
+  // Aplicar filtros cuando cambian tickets o filtros
+  useEffect(() => {
+    aplicarFiltros()
+  }, [tickets, filtroEstado, filtroTipo, busqueda])
+
+  const cargarDatos = useCallback(async () => {
     try {
-      setLoading(true);
+      setLoading(true)
 
       // Cargar información de la propiedad
       const { data: propData, error: propError } = await supabase
         .from('propiedades')
         .select('id, nombre')
         .eq('id', propiedadId)
-        .single();
+        .single()
 
-      if (propError) throw propError;
-      setPropiedad(propData);
+      if (propError) throw propError
+      setPropiedad(propData)
 
-      // Cargar pagos pendientes con información del servicio
-      const { data: pagosData, error: pagosError } = await supabase
-        .from('fechas_pago_servicios')
-        .select(`
-          id,
-          fecha_pago,
-          monto_estimado,
-          pagado,
-          servicios_inmueble!inner(
-            nombre,
-            tipo_servicio,
-            numero_contrato
-          )
-        `)
+      // Cargar tickets de la propiedad
+      const { data: ticketsData, error: ticketsError } = await supabase
+        .from('tickets')
+        .select('*')
         .eq('propiedad_id', propiedadId)
-        .eq('pagado', false)
-        .order('fecha_pago', { ascending: true })
-        .limit(50);
+        .order('fecha_programada', { ascending: true })
 
-      if (pagosError) {
-        console.error('Error cargando pagos:', pagosError);
-        setPagos([]);
+      if (ticketsError) {
+        logger.error('Error cargando tickets:', ticketsError)
+        toast.error('Error al cargar tickets')
+        setTickets([])
       } else {
-        // Transformar datos para que sean más fáciles de usar
-        const pagosTransformados = (pagosData || []).map(pago => ({
-          id: pago.id,
-          fecha_pago: pago.fecha_pago,
-          monto_estimado: pago.monto_estimado,
-          pagado: pago.pagado,
-          servicio: {
-            nombre: pago.servicios_inmueble.nombre,
-            tipo_servicio: pago.servicios_inmueble.tipo_servicio,
-            numero_contrato: pago.servicios_inmueble.numero_contrato
-          }
-        }));
-        setPagos(pagosTransformados);
+        setTickets(ticketsData || [])
       }
-
     } catch (error) {
-      console.error('Error cargando datos:', error);
-      toast.error('Error al cargar los datos');
+      logger.error('Error cargando datos:', error)
+      toast.error('Error al cargar datos')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }, [propiedadId, toast])
 
-  const handleMarcarPagado = async (pagoId: string, monto: number) => {
+  const aplicarFiltros = useCallback(() => {
+    let resultado = [...tickets]
+
+    // Filtro por estado
+    if (filtroEstado !== 'todos') {
+      resultado = resultado.filter(t => t.estado === filtroEstado)
+    }
+
+    // Filtro por tipo
+    if (filtroTipo !== 'todos') {
+      resultado = resultado.filter(t => t.tipo_ticket === filtroTipo)
+    }
+
+    // Filtro por búsqueda
+    if (busqueda.trim()) {
+      const termino = busqueda.toLowerCase()
+      resultado = resultado.filter(
+        t =>
+          t.titulo.toLowerCase().includes(termino) ||
+          t.descripcion?.toLowerCase().includes(termino) ||
+          t.responsable?.toLowerCase().includes(termino) ||
+          t.proveedor?.toLowerCase().includes(termino)
+      )
+    }
+
+    setTicketsFiltrados(resultado)
+  }, [tickets, filtroEstado, filtroTipo, busqueda])
+
+  const getDiasRestantes = useCallback((fechaProgramada: string) => {
+    const hoy = new Date()
+    hoy.setHours(0, 0, 0, 0)
+    const fecha = new Date(fechaProgramada + 'T00:00:00')
+    const diff = fecha.getTime() - hoy.getTime()
+    return Math.ceil(diff / (1000 * 60 * 60 * 24))
+  }, [])
+
+  const getUrgenciaBadge = useCallback((diasRestantes: number, estado: EstadoTicket) => {
+    if (estado === 'completado') {
+      return {
+        text: 'COMPLETADO',
+        classes: 'bg-green-100 text-green-700 border-green-300'
+      }
+    }
+
+    if (estado === 'cancelado') {
+      return {
+        text: 'CANCELADO',
+        classes: 'bg-gray-100 text-gray-600 border-gray-300'
+      }
+    }
+
+    if (diasRestantes < 0) {
+      return {
+        text: 'VENCIDO',
+        classes: 'bg-red-100 text-red-700 border-red-300'
+      }
+    }
+
+    if (diasRestantes === 0) {
+      return {
+        text: 'HOY',
+        classes: 'bg-orange-100 text-orange-700 border-orange-300'
+      }
+    }
+
+    if (diasRestantes <= 3) {
+      return {
+        text: 'PRÓXIMO',
+        classes: 'bg-yellow-100 text-yellow-700 border-yellow-300'
+      }
+    }
+
+    return {
+      text: `${diasRestantes} días`,
+      classes: 'bg-blue-100 text-blue-700 border-blue-300'
+    }
+  }, [])
+
+  const getTipoIcon = useCallback((tipo: TipoTicket) => {
+    const iconMap: Record<TipoTicket, string> = {
+      pago: '💰',
+      mantenimiento: '🔧',
+      reparacion: '🛠️',
+      limpieza: '🧹',
+      inspeccion: '🔍',
+      compra: '🛒',
+      otro: '📋'
+    }
+    return iconMap[tipo] || '📋'
+  }, [])
+
+  const handleMarcarCompletado = async (ticketId: string) => {
+    const confirmed = await confirm.success(
+      '¿Marcar como completado?',
+      'El ticket se marcará como completado'
+    )
+
+    if (!confirmed) return
+
     try {
       const { error } = await supabase
-        .from('fechas_pago_servicios')
+        .from('tickets')
         .update({
-          pagado: true,
-          fecha_pago_real: new Date().toISOString().split('T')[0],
-          monto_real: monto
+          estado: 'completado',
+          fecha_completado: new Date().toISOString().split('T')[0],
+          updated_at: new Date().toISOString()
         })
-        .eq('id', pagoId);
+        .eq('id', ticketId)
 
-      if (error) throw error;
+      if (error) throw error
 
-      toast.success('Pago marcado como realizado');
-      await cargarDatos();
+      toast.success('Ticket marcado como completado')
+      cargarDatos()
     } catch (error) {
-      console.error('Error marcando pago:', error);
-      toast.error('Error al marcar el pago');
+      logger.error('Error al marcar ticket como completado:', error)
+      toast.error('Error al completar ticket')
     }
-  };
+  }
 
-  const getEstadoUrgencia = (fechaPago: string): 'vencido' | 'hoy' | 'proximo' | 'futuro' => {
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    const fecha = new Date(fechaPago);
-    fecha.setHours(0, 0, 0, 0);
-    const diff = Math.floor((fecha.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+  const handleMarcarPagado = async (ticketId: string, pagado: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('tickets')
+        .update({
+          pagado: !pagado,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', ticketId)
 
-    if (diff < 0) return 'vencido';
-    if (diff === 0) return 'hoy';
-    if (diff <= 7) return 'proximo';
-    return 'futuro';
-  };
+      if (error) throw error
 
-  const getDiasRestantes = (fechaPago: string): number => {
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    const fecha = new Date(fechaPago);
-    fecha.setHours(0, 0, 0, 0);
-    return Math.floor((fecha.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
-  };
+      toast.success(pagado ? 'Ticket marcado como no pagado' : 'Ticket marcado como pagado')
+      cargarDatos()
+    } catch (error) {
+      logger.error('Error al actualizar estado de pago:', error)
+      toast.error('Error al actualizar pago')
+    }
+  }
 
-  const pagosFiltrados = pagos.filter(pago => {
-    if (filtro === 'todos') return true;
-    return getEstadoUrgencia(pago.fecha_pago) === filtro;
-  });
+  const handleEliminarTicket = async (ticketId: string) => {
+    const confirmed = await confirm.danger(
+      '¿Eliminar ticket?',
+      'Esta acción no se puede deshacer'
+    )
 
-  const contadores = {
-    vencido: pagos.filter(p => getEstadoUrgencia(p.fecha_pago) === 'vencido').length,
-    hoy: pagos.filter(p => getEstadoUrgencia(p.fecha_pago) === 'hoy').length,
-    proximo: pagos.filter(p => getEstadoUrgencia(p.fecha_pago) === 'proximo').length
-  };
+    if (!confirmed) return
 
-  const getTipoIcon = (tipo: string) => {
-    const iconos: { [key: string]: string } = {
-      agua: '💧',
-      gas: '🔥',
-      luz: '💡',
-      internet: '📡',
-      predial: '🏛️',
-      cuota_condominio: '🏘️',
-      mantenimiento_alberca: '🏊',
-      cctv: '📹',
-      seguro: '🛡️',
-      fumigacion: '🐛',
-      mantenimiento_aires: '❄️',
-      impermeabilizacion: '☔'
-    };
-    return iconos[tipo] || '📋';
-  };
+    try {
+      const { error } = await supabase
+        .from('tickets')
+        .delete()
+        .eq('id', ticketId)
 
-  if (loading) {
-    return <Loading message="Cargando calendario de pagos..." />;
+      if (error) throw error
+
+      toast.success('Ticket eliminado correctamente')
+      cargarDatos()
+    } catch (error) {
+      logger.error('Error al eliminar ticket:', error)
+      toast.error('Error al eliminar ticket')
+    }
+  }
+
+  const volverPropiedad = () => {
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/home`)
+  }
+
+  const resetForm = () => {
+    setFormData({
+      titulo: '',
+      descripcion: '',
+      tipo_ticket: 'otro',
+      prioridad: 'media',
+      responsable: '',
+      proveedor: '',
+      fecha_programada: new Date().toISOString().split('T')[0],
+      monto_estimado: '',
+      estado: 'pendiente'
+    })
+    setShowNuevoTicket(false)
+    setTicketEditando(null)
+  }
+
+  const handleSubmitTicket = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // Validación básica
+    if (!formData.titulo.trim()) {
+      toast.error('El título es requerido')
+      return
+    }
+
+    if (!formData.fecha_programada) {
+      toast.error('La fecha programada es requerida')
+      return
+    }
+
+    try {
+      setSubmitting(true)
+
+      const ticketData = {
+        propiedad_id: propiedadId,
+        titulo: formData.titulo.trim(),
+        descripcion: formData.descripcion.trim() || null,
+        tipo_ticket: formData.tipo_ticket,
+        prioridad: formData.prioridad,
+        responsable: formData.responsable.trim() || null,
+        proveedor: formData.proveedor.trim() || null,
+        fecha_programada: formData.fecha_programada,
+        monto_estimado: formData.monto_estimado ? parseFloat(formData.monto_estimado) : null,
+        estado: formData.estado,
+        pagado: false,
+        creado_por: user?.email || null,
+        created_at: new Date().toISOString()
+      }
+
+      const { error } = await supabase.from('tickets').insert([ticketData])
+
+      if (error) throw error
+
+      toast.success('Ticket creado correctamente')
+      resetForm()
+      cargarDatos()
+    } catch (error) {
+      logger.error('Error al crear ticket:', error)
+      toast.error('Error al crear ticket')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (authLoading || loading) {
+    return <Loading message="Cargando tickets..." />
+  }
+
+  if (!propiedad) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Propiedad no encontrada</h2>
+          <button
+            onClick={() => router.push('/dashboard/catalogo')}
+            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Volver al catálogo
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema">
+    <div className="min-h-screen bg-gray-50">
       <TopBar
-        title={`📅 ${propiedad?.nombre || 'Calendario de Pagos'}`}
-        showBackButton
-        onBackClick={() => router.push('/dashboard/catalogo')}
+        title={`Tickets - ${propiedad.nombre}`}
+        showBackButton={true}
+        onBack={volverPropiedad}
+        showAddButton={true}
+        onAddClick={() => setShowNuevoTicket(true)}
+        addButtonText="Nuevo Ticket"
       />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Tarjetas de Resumen - Estilo Plan C */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Vencidos */}
-          <div className="bg-white rounded-xl shadow-lg border-2 border-red-200 overflow-hidden transition-all hover:shadow-xl hover:scale-105">
-            <div className="bg-gradient-to-r from-red-500 to-red-600 p-4">
-              <div className="flex items-center justify-between text-white">
-                <div>
-                  <p className="text-sm font-medium opacity-90">Vencidos</p>
-                  <p className="text-4xl font-bold mt-1">{contadores.vencido}</p>
-                </div>
-                <div className="text-5xl opacity-90">🔴</div>
-              </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Filtros */}
+        <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Búsqueda */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Buscar
+              </label>
+              <input
+                type="text"
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                placeholder="Buscar tickets..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
-            <div className="p-4 bg-red-50">
-              <p className="text-sm text-red-700 font-medium">Requieren atención inmediata</p>
-            </div>
-          </div>
 
-          {/* Hoy */}
-          <div className="bg-white rounded-xl shadow-lg border-2 border-orange-200 overflow-hidden transition-all hover:shadow-xl hover:scale-105">
-            <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4">
-              <div className="flex items-center justify-between text-white">
-                <div>
-                  <p className="text-sm font-medium opacity-90">Hoy</p>
-                  <p className="text-4xl font-bold mt-1">{contadores.hoy}</p>
-                </div>
-                <div className="text-5xl opacity-90">⏰</div>
-              </div>
+            {/* Filtro Estado */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Estado
+              </label>
+              <select
+                value={filtroEstado}
+                onChange={e => setFiltroEstado(e.target.value as EstadoTicket | 'todos')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="todos">Todos los estados</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="en_progreso">En Progreso</option>
+                <option value="completado">Completado</option>
+                <option value="cancelado">Cancelado</option>
+              </select>
             </div>
-            <div className="p-4 bg-orange-50">
-              <p className="text-sm text-orange-700 font-medium">Vencen el día de hoy</p>
-            </div>
-          </div>
 
-          {/* Próximos 7 días */}
-          <div className="bg-white rounded-xl shadow-lg border-2 border-yellow-200 overflow-hidden transition-all hover:shadow-xl hover:scale-105">
-            <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-4">
-              <div className="flex items-center justify-between text-white">
-                <div>
-                  <p className="text-sm font-medium opacity-90">Próximos 7 días</p>
-                  <p className="text-4xl font-bold mt-1">{contadores.proximo}</p>
-                </div>
-                <div className="text-5xl opacity-90">📅</div>
-              </div>
+            {/* Filtro Tipo */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tipo
+              </label>
+              <select
+                value={filtroTipo}
+                onChange={e => setFiltroTipo(e.target.value as TipoTicket | 'todos')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="todos">Todos los tipos</option>
+                <option value="pago">💰 Pago/Servicio</option>
+                <option value="mantenimiento">🔧 Mantenimiento</option>
+                <option value="reparacion">🛠️ Reparación</option>
+                <option value="limpieza">🧹 Limpieza</option>
+                <option value="inspeccion">🔍 Inspección</option>
+                <option value="compra">🛒 Compra</option>
+                <option value="otro">📋 Otro</option>
+              </select>
             </div>
-            <div className="p-4 bg-yellow-50">
-              <p className="text-sm text-yellow-700 font-medium">Próximamente</p>
+
+            {/* Resumen */}
+            <div className="flex items-end">
+              <div className="text-sm text-gray-600">
+                <strong className="text-gray-900">{ticketsFiltrados.length}</strong> tickets
+                {filtroEstado !== 'todos' || filtroTipo !== 'todos' || busqueda
+                  ? ` (${tickets.length} total)`
+                  : ''}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Filtros - Estilo Plan C */}
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 mb-6">
-          <div className="flex gap-3 flex-wrap">
-            <button
-              onClick={() => setFiltro('todos')}
-              className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${
-                filtro === 'todos'
-                  ? 'bg-gradient-to-r from-ras-azul to-ras-turquesa text-white shadow-lg scale-105'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Todos ({pagos.length})
-            </button>
-            <button
-              onClick={() => setFiltro('vencido')}
-              className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${
-                filtro === 'vencido'
-                  ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg scale-105'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Vencidos ({contadores.vencido})
-            </button>
-            <button
-              onClick={() => setFiltro('hoy')}
-              className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${
-                filtro === 'hoy'
-                  ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg scale-105'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Hoy ({contadores.hoy})
-            </button>
-            <button
-              onClick={() => setFiltro('proximo')}
-              className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${
-                filtro === 'proximo'
-                  ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white shadow-lg scale-105'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Próximos ({contadores.proximo})
-            </button>
-          </div>
-        </div>
-
-        {/* Lista de pagos */}
-        {pagosFiltrados.length === 0 ? (
+        {/* Lista de Tickets */}
+        {ticketsFiltrados.length === 0 ? (
           <EmptyState
-            icon="✅"
-            title="No hay pagos pendientes"
-            message={
-              filtro === 'todos'
-                ? 'Todo está al día. Puedes agregar servicios desde el wizard de edición.'
-                : `No hay pagos en estado "${filtro}"`
+            title="No hay tickets"
+            description={
+              filtroEstado !== 'todos' || filtroTipo !== 'todos' || busqueda
+                ? 'No hay tickets que coincidan con los filtros'
+                : 'Crea tu primer ticket para comenzar'
             }
-            actionLabel="Gestionar Servicios"
-            onAction={() => router.push(`/dashboard/propiedad/${propiedadId}`)}
           />
         ) : (
           <div className="space-y-4">
-            {pagosFiltrados.map((pago) => {
-              const estado = getEstadoUrgencia(pago.fecha_pago);
-              const diasRestantes = getDiasRestantes(pago.fecha_pago);
-              
-              const colorClasses = {
-                vencido: 'border-red-300 bg-red-50',
-                hoy: 'border-orange-300 bg-orange-50',
-                proximo: 'border-yellow-300 bg-yellow-50',
-                futuro: 'border-gray-300 bg-gray-50'
-              }[estado];
-
-              const badgeClasses = {
-                vencido: 'bg-red-500 text-white',
-                hoy: 'bg-orange-500 text-white',
-                proximo: 'bg-yellow-500 text-white',
-                futuro: 'bg-gray-500 text-white'
-              }[estado];
+            {ticketsFiltrados.map(ticket => {
+              const diasRestantes = getDiasRestantes(ticket.fecha_programada)
+              const urgencia = getUrgenciaBadge(diasRestantes, ticket.estado)
 
               return (
                 <div
-                  key={pago.id}
-                  className={`bg-white rounded-xl shadow-md border-2 ${colorClasses} p-6 transition-all hover:shadow-xl hover:scale-[1.02]`}
+                  key={ticket.id}
+                  className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    {/* Info del servicio */}
+                  <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-ras-azul to-ras-turquesa flex items-center justify-center text-3xl shadow-lg">
-                          {getTipoIcon(pago.servicio.tipo_servicio)}
-                        </div>
-                        <div>
-                          <h3 className="text-xl font-bold text-gray-900 font-poppins">
-                            {pago.servicio.nombre}
-                          </h3>
-                          <p className="text-sm text-gray-600 capitalize">
-                            {pago.servicio.tipo_servicio.replace('_', ' ')}
-                          </p>
-                        </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${badgeClasses} ml-auto`}>
-                          {estado === 'vencido' && '¡VENCIDO!'}
-                          {estado === 'hoy' && 'HOY'}
-                          {estado === 'proximo' && 'PRÓXIMO'}
-                          {estado === 'futuro' && 'FUTURO'}
+                      {/* Header */}
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-2xl">{getTipoIcon(ticket.tipo_ticket)}</span>
+                        <h3 className="text-lg font-bold text-gray-900">{ticket.titulo}</h3>
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-bold border ${urgencia.classes}`}
+                        >
+                          {urgencia.text}
                         </span>
+                        {ticket.pagado && (
+                          <span className="px-3 py-1 rounded-full text-xs font-bold border bg-green-100 text-green-700 border-green-300">
+                            ✓ PAGADO
+                          </span>
+                        )}
                       </div>
 
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                        <div className="bg-white/50 rounded-lg p-3">
-                          <p className="text-xs text-gray-600 mb-1 font-medium">Fecha de pago</p>
-                          <p className="text-sm font-bold text-gray-900">
-                            {new Date(pago.fecha_pago).toLocaleDateString('es-MX', {
-                              day: '2-digit',
+                      {/* Descripción */}
+                      {ticket.descripcion && (
+                        <p className="text-gray-600 mb-3">{ticket.descripcion}</p>
+                      )}
+
+                      {/* Detalles */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-500">Fecha:</span>
+                          <p className="font-medium text-gray-900">
+                            {new Date(ticket.fecha_programada).toLocaleDateString('es-MX', {
+                              day: 'numeric',
                               month: 'short',
                               year: 'numeric'
                             })}
                           </p>
                         </div>
 
-                        <div className="bg-white/50 rounded-lg p-3">
-                          <p className="text-xs text-gray-600 mb-1 font-medium">Monto</p>
-                          <p className="text-sm font-bold text-gray-900">
-                            ${pago.monto_estimado.toLocaleString('es-MX', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2
-                            })}
-                          </p>
-                        </div>
+                        {ticket.monto_estimado && (
+                          <div>
+                            <span className="text-gray-500">Monto:</span>
+                            <p className="font-medium text-gray-900">
+                              ${ticket.monto_estimado.toLocaleString('es-MX')} MXN
+                            </p>
+                          </div>
+                        )}
 
-                        <div className="bg-white/50 rounded-lg p-3">
-                          <p className="text-xs text-gray-600 mb-1 font-medium">Días</p>
-                          <p className="text-sm font-bold text-gray-900">
-                            {diasRestantes === 0
-                              ? 'Hoy'
-                              : diasRestantes > 0
-                              ? `En ${diasRestantes}d`
-                              : `${Math.abs(diasRestantes)}d atrás`}
-                          </p>
-                        </div>
+                        {ticket.responsable && (
+                          <div>
+                            <span className="text-gray-500">Responsable:</span>
+                            <p className="font-medium text-gray-900">{ticket.responsable}</p>
+                          </div>
+                        )}
 
-                        <div className="bg-white/50 rounded-lg p-3">
-                          <p className="text-xs text-gray-600 mb-1 font-medium">Contrato</p>
-                          <p className="text-sm font-bold text-gray-900 truncate">
-                            {pago.servicio.numero_contrato || 'N/A'}
-                          </p>
-                        </div>
+                        {ticket.proveedor && (
+                          <div>
+                            <span className="text-gray-500">Proveedor:</span>
+                            <p className="font-medium text-gray-900">{ticket.proveedor}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* Botones de acción */}
-                    <div className="flex flex-col gap-3">
+                    {/* Acciones */}
+                    <div className="flex gap-2 ml-4">
+                      {ticket.estado !== 'completado' && (
+                        <>
+                          <button
+                            onClick={() => handleMarcarCompletado(ticket.id)}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                          >
+                            ✓ Completar
+                          </button>
+
+                          {ticket.monto_estimado && (
+                            <button
+                              onClick={() => handleMarcarPagado(ticket.id, ticket.pagado)}
+                              className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
+                                ticket.pagado
+                                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                  : 'bg-blue-600 text-white hover:bg-blue-700'
+                              }`}
+                            >
+                              {ticket.pagado ? 'Marcar no pagado' : '💳 Marcar pagado'}
+                            </button>
+                          )}
+                        </>
+                      )}
+
                       <button
-                        onClick={() => handleMarcarPagado(pago.id, pago.monto_estimado)}
-                        className="px-4 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-md hover:shadow-lg font-semibold text-sm whitespace-nowrap flex items-center gap-2"
+                        onClick={() => handleEliminarTicket(ticket.id)}
+                        className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium border border-red-200"
                       >
-                        <span>✓</span>
-                        Marcar pagado
-                      </button>
-                      <button className="px-4 py-3 bg-gradient-to-r from-ras-azul to-ras-turquesa text-white rounded-lg hover:opacity-90 transition-all shadow-md hover:shadow-lg font-semibold text-sm whitespace-nowrap flex items-center gap-2">
-                        <span>🔗</span>
-                        Link a pago
+                        Eliminar
                       </button>
                     </div>
                   </div>
                 </div>
-              );
+              )
             })}
           </div>
         )}
-      </div>
+      </main>
+
+      {/* Modal para crear ticket */}
+      {showNuevoTicket && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6 my-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Nuevo Ticket</h2>
+              <button
+                onClick={resetForm}
+                className="text-gray-400 hover:text-gray-600 text-2xl"
+                disabled={submitting}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitTicket} className="space-y-4">
+              {/* Título */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Título <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.titulo}
+                  onChange={e => setFormData({ ...formData, titulo: e.target.value })}
+                  placeholder="Ej: Pago de agua, Reparar calentador, etc."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  disabled={submitting}
+                />
+              </div>
+
+              {/* Descripción */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Descripción
+                </label>
+                <textarea
+                  value={formData.descripcion}
+                  onChange={e => setFormData({ ...formData, descripcion: e.target.value })}
+                  placeholder="Detalles adicionales sobre el ticket..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={submitting}
+                />
+              </div>
+
+              {/* Tipo y Prioridad */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tipo <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.tipo_ticket}
+                    onChange={e =>
+                      setFormData({ ...formData, tipo_ticket: e.target.value as TipoTicket })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                    disabled={submitting}
+                  >
+                    <option value="pago">💰 Pago/Servicio</option>
+                    <option value="mantenimiento">🔧 Mantenimiento</option>
+                    <option value="reparacion">🛠️ Reparación</option>
+                    <option value="limpieza">🧹 Limpieza</option>
+                    <option value="inspeccion">🔍 Inspección</option>
+                    <option value="compra">🛒 Compra</option>
+                    <option value="otro">📋 Otro</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Prioridad <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.prioridad}
+                    onChange={e =>
+                      setFormData({ ...formData, prioridad: e.target.value as PrioridadTicket })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                    disabled={submitting}
+                  >
+                    <option value="baja">Baja</option>
+                    <option value="media">Media</option>
+                    <option value="alta">Alta</option>
+                    <option value="urgente">Urgente</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Fecha programada y Monto estimado */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Fecha programada <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.fecha_programada}
+                    onChange={e =>
+                      setFormData({ ...formData, fecha_programada: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                    disabled={submitting}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Monto estimado (MXN)
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.monto_estimado}
+                    onChange={e => setFormData({ ...formData, monto_estimado: e.target.value })}
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+
+              {/* Responsable y Proveedor */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Responsable
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.responsable}
+                    onChange={e => setFormData({ ...formData, responsable: e.target.value })}
+                    placeholder="Nombre del responsable"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={submitting}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Proveedor
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.proveedor}
+                    onChange={e => setFormData({ ...formData, proveedor: e.target.value })}
+                    placeholder="Nombre del proveedor"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+
+              {/* Estado inicial */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Estado inicial
+                </label>
+                <select
+                  value={formData.estado}
+                  onChange={e =>
+                    setFormData({ ...formData, estado: e.target.value as EstadoTicket })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={submitting}
+                >
+                  <option value="pendiente">Pendiente</option>
+                  <option value="en_progreso">En Progreso</option>
+                </select>
+              </div>
+
+              {/* Botones */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="flex-1 px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                  disabled={submitting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Creando...' : 'Crear Ticket'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
-  );
+  )
 }

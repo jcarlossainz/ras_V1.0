@@ -578,7 +578,7 @@ export default function CuentasGlobalPage() {
                 <thead className="bg-gradient-to-r from-ras-azul to-ras-turquesa text-white">
                   <tr>
                     {/* Header FECHA con dropdown */}
-                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase relative">
+                    <th className="px-6 py-3 text-left text-xs font-semibold font-poppins uppercase relative">
                       <div className="flex items-center gap-2">
                         <span>Fecha</span>
                         <button
@@ -632,7 +632,7 @@ export default function CuentasGlobalPage() {
                     </th>
                     
                     {/* Header TIPO con dropdown */}
-                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase relative">
+                    <th className="px-6 py-3 text-left text-xs font-semibold font-poppins uppercase relative">
                       <div className="flex items-center gap-2">
                         <span>Tipo</span>
                         <button
@@ -696,7 +696,7 @@ export default function CuentasGlobalPage() {
                     </th>
                     
                     {/* Header TÍTULO con dropdown */}
-                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase relative">
+                    <th className="px-6 py-3 text-left text-xs font-semibold font-poppins uppercase relative">
                       <div className="flex items-center gap-2">
                         <span>Título</span>
                         <button
@@ -746,7 +746,7 @@ export default function CuentasGlobalPage() {
                     </th>
                     
                     {/* Header PROPIEDAD con dropdown */}
-                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase relative">
+                    <th className="px-6 py-3 text-left text-xs font-semibold font-poppins uppercase relative">
                       <div className="flex items-center gap-2">
                         <span>Propiedad</span>
                         <button
@@ -802,7 +802,7 @@ export default function CuentasGlobalPage() {
                     </th>
                     
                     {/* Header RESPONSABLE con dropdown */}
-                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase relative">
+                    <th className="px-6 py-3 text-left text-xs font-semibold font-poppins uppercase relative">
                       <div className="flex items-center gap-2">
                         <span>Responsable</span>
                         <button
@@ -850,9 +850,9 @@ export default function CuentasGlobalPage() {
                         </>
                       )}
                     </th>
-                    
-                    <th className="px-6 py-3 text-right text-xs font-semibold uppercase"></th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold uppercase"></th>
+
+                    <th className="px-6 py-3 text-right text-xs font-semibold font-poppins uppercase">Monto</th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold font-poppins uppercase">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">

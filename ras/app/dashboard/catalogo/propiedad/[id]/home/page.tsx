@@ -1,12 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+/**
+ * HOME DE PROPIEDAD
+ * Vista principal con todos los datos generales de la propiedad
+ * Optimizado con useCallback y queries específicas
+ */
+
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { logger } from '@/lib/logger'
 import { useToast } from '@/hooks/useToast'
 import { useAuth } from '@/hooks/useAuth'
-import { useLogout } from '@/hooks/useLogout'
 import { useConfirm } from '@/components/ui/confirm-modal'
 import TopBar from '@/components/ui/topbar'
 import Loading from '@/components/ui/loading'
@@ -265,8 +270,7 @@ export default function HomePropiedad() {
   const params = useParams()
   const toast = useToast()
   const confirm = useConfirm()
-  const { user, profile, loading: authLoading, isAuthenticated } = useAuth()
-  const { logout } = useLogout()
+  const { user, loading: authLoading, isAuthenticated } = useAuth()
   const propiedadId = params?.id as string
 
   const [loading, setLoading] = useState(true)
@@ -282,14 +286,7 @@ export default function HomePropiedad() {
   const [nombreDuplicado, setNombreDuplicado] = useState('')
   const [duplicando, setDuplicando] = useState(false)
 
-  // Cargar propiedad cuando el usuario está autenticado
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      cargarPropiedad()
-    }
-  }, [isAuthenticated, user])
-
-  const cargarPropiedad = async () => {
+  const cargarPropiedad = useCallback(async () => {
     try {
       const { data: propData, error } = await supabase
         .from('propiedades')
@@ -396,22 +393,32 @@ export default function HomePropiedad() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [propiedadId, toast])
 
-  const volverCatalogo = () => {
+  // Cargar propiedad cuando el usuario está autenticado
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      cargarPropiedad()
+    }
+  }, [isAuthenticated, user, cargarPropiedad])
+
+  const volverCatalogo = useCallback(() => {
     router.push('/dashboard/catalogo')
-  }
+  }, [router])
 
-  const abrirCuentas = () => {
-    router.push(`/dashboard/propiedad/${propiedadId}/cuentas`)
-  }
+  const irAGaleria = useCallback(() => {
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/galeria`)
+  }, [router, propiedadId])
 
-  const editarPropiedad = () => {
+  const irATickets = useCallback(() => {
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/tickets`)
+  }, [router, propiedadId])
+
+  const editarPropiedad = useCallback(() => {
     toast.info('Función de editar en desarrollo')
-    logger.log('Editar propiedad')
-  }
+  }, [toast])
 
-  const duplicarPropiedad = async () => {
+  const duplicarPropiedad = useCallback(async () => {
     if (!nombreDuplicado.trim()) {
       toast.error('Ingresa un nombre para la propiedad duplicada')
       return
@@ -446,9 +453,9 @@ export default function HomePropiedad() {
     } finally {
       setDuplicando(false)
     }
-  }
+  }, [nombreDuplicado, propiedad, router, toast])
 
-  const eliminarPropiedad = async () => {
+  const eliminarPropiedad = useCallback(async () => {
     const confirmed = await confirm.danger(
       `¿Eliminar "${propiedad?.nombre}"?`,
       'Esta acción NO se puede deshacer. Se eliminarán todos los datos, colaboradores, fotos, tickets y todo el historial.'
@@ -470,10 +477,10 @@ export default function HomePropiedad() {
       logger.error('Error al eliminar propiedad:', error)
       toast.error('Error al eliminar la propiedad')
     }
-  }
+  }, [confirm, propiedad, propiedadId, router, toast])
 
   if (authLoading || loading) {
-    return <Loading />
+    return <Loading message="Cargando propiedad..." />
   }
 
   if (!propiedad) {
@@ -494,15 +501,85 @@ export default function HomePropiedad() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopBar
-        title={propiedad.nombre}
-        showBackButton={true}
-        showUserInfo={true}
-        userEmail={user?.email}
-        onLogout={logout}
-      />
+      <TopBar title={propiedad.nombre} showBackButton={true} onBack={volverCatalogo} />
 
       <main className="max-w-5xl mx-auto px-5 py-6">
+        {/* Navegación rápida */}
+        <div className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+          <button
+            onClick={irATickets}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
+          >
+            <svg
+              className="w-5 h-5 text-gray-600 group-hover:text-blue-600"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+              />
+            </svg>
+            <span className="font-semibold text-gray-900 group-hover:text-blue-600">Tickets</span>
+          </button>
+
+          <button
+            onClick={irAGaleria}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all group"
+          >
+            <svg
+              className="w-5 h-5 text-gray-600 group-hover:text-purple-600"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+            <span className="font-semibold text-gray-900 group-hover:text-purple-600">Galería</span>
+          </button>
+
+          <button
+            onClick={() => toast.info('Calendario próximamente')}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all group"
+          >
+            <svg
+              className="w-5 h-5 text-gray-600 group-hover:text-green-600"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            <span className="font-semibold text-gray-900 group-hover:text-green-600">Calendario</span>
+          </button>
+
+          <button
+            onClick={() => toast.info('Balance próximamente')}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group"
+          >
+            <svg
+              className="w-5 h-5 text-gray-600 group-hover:text-orange-600"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <line x1="12" y1="1" x2="12" y2="23" />
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+            <span className="font-semibold text-gray-900 group-hover:text-orange-600">Balance</span>
+          </button>
+        </div>
         
         {/* Header con badges */}
         <div className="mb-6">

@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { logger } from '@/lib/logger'
-import { useToast } from '@/hooks/useToast'
-import { useConfirm } from '@/components/ui/confirm-modal'
+import { useAuth } from '@/hooks/useAuth'
+import { useLogout } from '@/hooks/useLogout'
 import TopBar from '@/components/ui/topbar'
 import Card from '@/components/ui/card'
 import Loading from '@/components/ui/loading'
@@ -36,42 +36,16 @@ interface DashboardMetrics {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const toast = useToast()
-  const confirm = useConfirm()
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, profile, loading, isAuthenticated } = useAuth()
+  const { logout, isLoggingOut } = useLogout()
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
 
+  // Cargar métricas cuando el usuario está autenticado
   useEffect(() => {
-    checkUser()
-  }, [])
-
-  const checkUser = async () => {
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      
-      if (!authUser) {
-        router.push('/login')
-        return
-      }
-
-      setUser(authUser)
-
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single()
-
-      setProfile(profileData)
-      await cargarMetricas(authUser.id)
-      setLoading(false)
-    } catch (error) {
-      logger.error('Error en checkUser:', error)
-      router.push('/login')
+    if (isAuthenticated && user) {
+      cargarMetricas(user.id)
     }
-  }
+  }, [isAuthenticated, user])
 
   const cargarMetricas = async (userId: string) => {
     try {
@@ -169,24 +143,6 @@ export default function DashboardPage() {
     }
   }
 
-  const handleLogout = async () => {
-    const confirmed = await confirm.warning(
-      '¿Estás seguro que deseas cerrar sesión?',
-      'Se cerrará tu sesión actual'
-    )
-    
-    if (!confirmed) return
-
-    try {
-      await supabase.auth.signOut()
-      toast.success('Sesión cerrada correctamente')
-      router.push('/login')
-    } catch (error: any) {
-      logger.error('Error al cerrar sesión:', error)
-      toast.error('Error al cerrar sesión')
-    }
-  }
-
   const formatearFecha = (fecha: string | null) => {
     if (!fecha) return 'N/A'
     return new Date(fecha).toLocaleDateString('es-MX', {
@@ -201,12 +157,12 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema">
-      <TopBar 
+      <TopBar
         title="Inicio"
         showAddButton={false}
         showUserInfo={true}
         userEmail={user?.email}
-        onLogout={handleLogout}
+        onLogout={logout}
       />
 
       {/* Main Content */}

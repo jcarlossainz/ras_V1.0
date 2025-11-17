@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/useToast'
+import { useAuth } from '@/hooks/useAuth'
 import TopBar from '@/components/ui/topbar'
 import Loading from '@/components/ui/loading'
 import EmptyState from '@/components/ui/emptystate'
@@ -28,77 +29,62 @@ interface Movimiento {
 export default function CuentasGlobalPage() {
   const router = useRouter()
   const toast = useToast()
+  const { user, profile, loading, isAuthenticated } = useAuth()
 
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
   const [movimientos, setMovimientos] = useState<Movimiento[]>([])
   const [movimientosFiltrados, setMovimientosFiltrados] = useState<Movimiento[]>([])
   const [propiedades, setPropiedades] = useState<{ id: string; nombre: string }[]>([])
-  
+
   // Filtros
   const [busqueda, setBusqueda] = useState('')
   const [propiedadFiltroTabla, setPropiedadFiltroTabla] = useState<string>('todas')
   const [tipoFiltroTabla, setTipoFiltroTabla] = useState<string>('todos')
   const [ordenFecha, setOrdenFecha] = useState<'asc' | 'desc'>('asc') // asc = más antigua primero (por defecto)
-  
+
   // Filtro de fechas para la TABLA (default = mes actual)
   const primerDiaMes = new Date()
   primerDiaMes.setDate(1)
   primerDiaMes.setHours(0, 0, 0, 0)
-  
+
   const [fechaDesdeTabla, setFechaDesdeTabla] = useState(primerDiaMes.toISOString().split('T')[0])
   const [fechaHastaTabla, setFechaHastaTabla] = useState(new Date().toISOString().split('T')[0])
-  
+
   // Dropdowns en headers de tabla
   const [showPropiedadDropdownTabla, setShowPropiedadDropdownTabla] = useState(false)
   const [showTipoDropdownTabla, setShowTipoDropdownTabla] = useState(false)
   const [showFechaDropdownTabla, setShowFechaDropdownTabla] = useState(false)
   const [showTituloDropdownTabla, setShowTituloDropdownTabla] = useState(false)
   const [showResponsableDropdownTabla, setShowResponsableDropdownTabla] = useState(false)
-  
+
   // Filtros del comparativo (multi-select)
   const [propietarioComparativo, setPropietarioComparativo] = useState<string[]>([])
   const [propiedadComparativo, setPropiedadComparativo] = useState<string[]>([])
   const [showPropietarioDropdown, setShowPropietarioDropdown] = useState(false)
   const [showPropiedadDropdown, setShowPropiedadDropdown] = useState(false)
-  
+
   // Filtro de rango de fechas personalizado (inicializado en el mes anterior por defecto)
   const mesAnteriorInicio = new Date()
   mesAnteriorInicio.setMonth(mesAnteriorInicio.getMonth() - 1)
   mesAnteriorInicio.setDate(1)
-  
+
   const mesAnteriorFin = new Date()
   mesAnteriorFin.setDate(0) // Último día del mes anterior
-  
+
   const [fechaDesde, setFechaDesde] = useState(mesAnteriorInicio.toISOString().split('T')[0])
   const [fechaHasta, setFechaHasta] = useState(mesAnteriorFin.toISOString().split('T')[0])
 
+  // Cargar datos cuando el usuario está autenticado
   useEffect(() => {
-    checkUser()
-  }, [])
+    if (isAuthenticated && user) {
+      cargarDatos(user.id)
+    }
+  }, [isAuthenticated, user])
 
   useEffect(() => {
     if (movimientos.length > 0) {
       aplicarFiltros()
     }
   }, [movimientos, propiedadFiltroTabla, tipoFiltroTabla, busqueda, ordenFecha, fechaDesdeTabla, fechaHastaTabla])
-
-  const checkUser = async () => {
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (!authUser) {
-      router.push('/login')
-      return
-    }
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', authUser.id)
-      .single()
-    
-    setUser({ ...profile, id: authUser.id })
-    await cargarDatos(authUser.id)
-    setLoading(false)
-  }
 
   const cargarDatos = async (userId: string) => {
     try {

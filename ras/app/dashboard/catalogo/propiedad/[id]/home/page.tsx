@@ -5,6 +5,8 @@ import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { logger } from '@/lib/logger'
 import { useToast } from '@/hooks/useToast'
+import { useAuth } from '@/hooks/useAuth'
+import { useLogout } from '@/hooks/useLogout'
 import { useConfirm } from '@/components/ui/confirm-modal'
 import TopBar from '@/components/ui/topbar'
 import Loading from '@/components/ui/loading'
@@ -263,42 +265,29 @@ export default function HomePropiedad() {
   const params = useParams()
   const toast = useToast()
   const confirm = useConfirm()
+  const { user, profile, loading: authLoading, isAuthenticated } = useAuth()
+  const { logout } = useLogout()
   const propiedadId = params?.id as string
-  
+
   const [loading, setLoading] = useState(true)
   const [propiedad, setPropiedad] = useState<PropiedadData | null>(null)
   const [propietario, setPropietario] = useState<Contacto | null>(null)
   const [supervisor, setSupervisor] = useState<Contacto | null>(null)
   const [inquilino, setInquilino] = useState<Contacto | null>(null)
   const [proveedores, setProveedores] = useState<Contacto[]>([])
-  const [user, setUser] = useState<any>(null)
-  
+
   // Estados para modales
   const [showCompartir, setShowCompartir] = useState(false)
   const [showDuplicarModal, setShowDuplicarModal] = useState(false)
   const [nombreDuplicado, setNombreDuplicado] = useState('')
   const [duplicando, setDuplicando] = useState(false)
 
+  // Cargar propiedad cuando el usuario está autenticado
   useEffect(() => {
-    checkUser()
-  }, [])
-
-  const checkUser = async () => {
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (!authUser) { 
-      router.push('/login')
-      return 
+    if (isAuthenticated && user) {
+      cargarPropiedad()
     }
-    
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', authUser.id)
-      .single()
-    
-    setUser({ ...profile, id: authUser.id })
-    cargarPropiedad()
-  }
+  }, [isAuthenticated, user])
 
   const cargarPropiedad = async () => {
     try {
@@ -388,24 +377,6 @@ export default function HomePropiedad() {
     }
   }
 
-  const handleLogout = async () => {
-    const confirmed = await confirm.warning(
-      '¿Estás seguro que deseas cerrar sesión?',
-      'Se cerrará tu sesión actual'
-    )
-    
-    if (!confirmed) return
-
-    try {
-      await supabase.auth.signOut()
-      toast.success('Sesión cerrada correctamente')
-      router.push('/login')
-    } catch (error: any) {
-      logger.error('Error al cerrar sesión:', error)
-      toast.error('Error al cerrar sesión')
-    }
-  }
-
   const volverCatalogo = () => {
     router.push('/dashboard/catalogo')
   }
@@ -480,7 +451,7 @@ export default function HomePropiedad() {
     }
   }
 
-  if (loading) {
+  if (authLoading || loading) {
     return <Loading />
   }
 
@@ -507,7 +478,7 @@ export default function HomePropiedad() {
         showBackButton={true}
         showUserInfo={true}
         userEmail={user?.email}
-        onLogout={handleLogout}
+        onLogout={logout}
       />
 
       <main className="max-w-5xl mx-auto px-5 py-6">

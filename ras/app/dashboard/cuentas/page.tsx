@@ -6,7 +6,7 @@
  * Diseño alineado con Calendario y Tickets RAS
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/useToast'
@@ -73,20 +73,7 @@ export default function CuentasGlobalPage() {
   const [fechaDesde, setFechaDesde] = useState(mesAnteriorInicio.toISOString().split('T')[0])
   const [fechaHasta, setFechaHasta] = useState(mesAnteriorFin.toISOString().split('T')[0])
 
-  // Cargar datos cuando el usuario está autenticado
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      cargarDatos(user.id)
-    }
-  }, [isAuthenticated, user])
-
-  useEffect(() => {
-    if (movimientos.length > 0) {
-      aplicarFiltros()
-    }
-  }, [movimientos, propiedadFiltroTabla, tipoFiltroTabla, busqueda, ordenFecha, fechaDesdeTabla, fechaHastaTabla])
-
-  const cargarDatos = async (userId: string) => {
+  const cargarDatos = useCallback(async (userId: string) => {
     try {
       // Cargar propiedades
       const { data: propsPropias } = await supabase
@@ -166,9 +153,9 @@ export default function CuentasGlobalPage() {
       console.error('Error cargando datos:', error)
       toast.error('Error al cargar cuentas')
     }
-  }
+  }, [toast])
 
-  const aplicarFiltros = () => {
+  const aplicarFiltros = useCallback(() => {
     let filtrados = [...movimientos]
 
     // Filtro por rango de fechas de la TABLA
@@ -212,9 +199,22 @@ export default function CuentasGlobalPage() {
     }
 
     setMovimientosFiltrados(filtrados)
-  }
+  }, [movimientos, propiedadFiltroTabla, tipoFiltroTabla, busqueda, ordenFecha, fechaDesdeTabla, fechaHastaTabla])
 
-  const limpiarFiltros = () => {
+  // Cargar datos cuando el usuario está autenticado
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      cargarDatos(user.id)
+    }
+  }, [isAuthenticated, user, cargarDatos])
+
+  useEffect(() => {
+    if (movimientos.length > 0) {
+      aplicarFiltros()
+    }
+  }, [movimientos, aplicarFiltros])
+
+  const limpiarFiltros = useCallback(() => {
     setPropiedadFiltroTabla('todas')
     setTipoFiltroTabla('todos')
     setBusqueda('')
@@ -224,7 +224,7 @@ export default function CuentasGlobalPage() {
     primerDia.setHours(0, 0, 0, 0)
     setFechaDesdeTabla(primerDia.toISOString().split('T')[0])
     setFechaHastaTabla(new Date().toISOString().split('T')[0])
-  }
+  }, [])
 
   const formatearFecha = (fecha: string) => {
     return new Date(fecha).toLocaleDateString('es-MX', {

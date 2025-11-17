@@ -5,7 +5,7 @@
  * Diseño profesional alineado con Cuentas y Calendario RAS
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/useToast'
@@ -45,17 +45,10 @@ export default function DirectorioPage() {
   // Vista: lista o tarjetas
   const [vistaActual, setVistaActual] = useState<'lista' | 'tarjetas'>('lista')
 
-  // Cargar contactos cuando el usuario está autenticado
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      cargarContactos(user.id)
-    }
-  }, [isAuthenticated, user])
-
-  const cargarContactos = async (userId: string) => {
+  const cargarContactos = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('contactos')
-      .select('*')
+      .select('id, user_id, full_name, email, telefono, tipo, categoria_proveedor, activo, notas, created_at, updated_at')
       .eq('user_id', userId)
       .eq('activo', true)
       .order('created_at', { ascending: false })
@@ -67,12 +60,19 @@ export default function DirectorioPage() {
     }
     
     setContactos(data || [])
-  }
+  }, [toast])
 
-  const handleAgregarContacto = () => {
+  // Cargar contactos cuando el usuario está autenticado
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      cargarContactos(user.id)
+    }
+  }, [isAuthenticated, user, cargarContactos])
+
+  const handleAgregarContacto = useCallback(() => {
     setContactoEditar(null)
     setShowModal(true)
-  }
+  }, [])
 
   const handleEditarContacto = (contacto: Contacto, e: React.MouseEvent) => {
     e.stopPropagation()

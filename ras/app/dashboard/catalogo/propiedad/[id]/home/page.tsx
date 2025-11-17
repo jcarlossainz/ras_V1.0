@@ -293,7 +293,28 @@ export default function HomePropiedad() {
     try {
       const { data: propData, error } = await supabase
         .from('propiedades')
-        .select('*')
+        .select(`
+          id,
+          user_id,
+          nombre,
+          tipo_propiedad,
+          estados,
+          mobiliario,
+          capacidad_personas,
+          tamano_terreno,
+          tamano_construccion,
+          ubicacion,
+          precios,
+          datos_renta_largo_plazo,
+          datos_renta_vacacional,
+          datos_venta,
+          propietario_id,
+          supervisor_id,
+          inquilino_id,
+          espacios,
+          created_at,
+          updated_at
+        `)
         .eq('id', propiedadId)
         .single()
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { logger } from '@/lib/logger'
@@ -40,14 +40,7 @@ export default function DashboardPage() {
   const { logout, isLoggingOut } = useLogout()
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
 
-  // Cargar métricas cuando el usuario está autenticado
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      cargarMetricas(user.id)
-    }
-  }, [isAuthenticated, user])
-
-  const cargarMetricas = async (userId: string) => {
+  const cargarMetricas = useCallback(async (userId: string) => {
     try {
       // Obtener propiedades del usuario
       const { data: propsPropias } = await supabase
@@ -141,15 +134,22 @@ export default function DashboardPage() {
     } catch (error) {
       logger.error('Error cargando métricas:', error)
     }
-  }
+  }, []) // No dependencies needed - function uses only parameters
 
-  const formatearFecha = (fecha: string | null) => {
+  // Cargar métricas cuando el usuario está autenticado
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      cargarMetricas(user.id)
+    }
+  }, [isAuthenticated, user, cargarMetricas])
+
+  const formatearFecha = useCallback((fecha: string | null) => {
     if (!fecha) return 'N/A'
     return new Date(fecha).toLocaleDateString('es-MX', {
       day: 'numeric',
       month: 'short'
     })
-  }
+  }, [])
 
   if (loading) {
     return <Loading message="Cargando dashboard..." />

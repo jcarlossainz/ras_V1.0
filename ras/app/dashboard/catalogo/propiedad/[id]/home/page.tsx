@@ -414,6 +414,14 @@ export default function HomePropiedad() {
     router.push(`/dashboard/catalogo/propiedad/${propiedadId}/tickets`)
   }, [router, propiedadId])
 
+  const irACalendario = useCallback(() => {
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/calendario`)
+  }, [router, propiedadId])
+
+  const irABalance = useCallback(() => {
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/balance`)
+  }, [router, propiedadId])
+
   const editarPropiedad = useCallback(() => {
     toast.info('Función de editar en desarrollo')
   }, [toast])
@@ -545,7 +553,7 @@ export default function HomePropiedad() {
           </button>
 
           <button
-            onClick={() => toast.info('Calendario próximamente')}
+            onClick={irACalendario}
             className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all group"
           >
             <svg
@@ -564,7 +572,7 @@ export default function HomePropiedad() {
           </button>
 
           <button
-            onClick={() => toast.info('Balance próximamente')}
+            onClick={irABalance}
             className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group"
           >
             <svg

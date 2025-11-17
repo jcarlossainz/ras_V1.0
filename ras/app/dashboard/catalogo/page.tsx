@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/useToast'
@@ -55,72 +55,114 @@ export default function CatalogoPage() {
     setLoading(false)
   }
 
-  const cargarPropiedades = async (userId: string) => {
-    // ✅ ACTUALIZADO: usar owner_id en lugar de user_id
-    const { data: propiedadesPropias } = await supabase
-      .from('propiedades')
-      .select('id, owner_id, nombre_propiedad, created_at')
-      .eq('owner_id', userId)
-      .order('created_at', { ascending: false })
-    
-    const { data: propiedadesCompartidas } = await supabase
-      .from('propiedades_colaboradores')
-      .select('propiedad_id')
-      .eq('user_id', userId)
-    
-    let propiedadesCompartidasData: any[] = []
-    if (propiedadesCompartidas && propiedadesCompartidas.length > 0) {
-      const idsCompartidos = propiedadesCompartidas.map(p => p.propiedad_id)
-      const { data: datosCompartidos } = await supabase
+  const cargarPropiedades = useCallback(async (userId: string) => {
+    try {
+      // ✅ ACTUALIZADO: usar owner_id en lugar de user_id
+      const { data: propiedadesPropias, error: errorPropias } = await supabase
         .from('propiedades')
         .select('id, owner_id, nombre_propiedad, created_at')
-        .in('id', idsCompartidos)
-      propiedadesCompartidasData = datosCompartidos || []
-    }
-    
-    const todasPropiedades = [
-      ...(propiedadesPropias || []).map(p => ({ 
-        ...p, 
-        nombre: p.nombre_propiedad,
-        es_propio: true 
-      })),
-      ...(propiedadesCompartidasData || []).map(p => ({ 
-        ...p, 
-        nombre: p.nombre_propiedad,
-        es_propio: false 
-      }))
-    ]
-    
-    for (const prop of todasPropiedades) {
-      const { data: colaboradores } = await supabase
+        .eq('owner_id', userId)
+        .order('created_at', { ascending: false })
+
+      if (errorPropias) {
+        throw errorPropias
+      }
+
+      const { data: propiedadesCompartidas, error: errorCompartidas } = await supabase
         .from('propiedades_colaboradores')
-        .select(`
-          user_id,
-          profiles:user_id (
-            nombre:nombre,
-            email:email
-          )
-        `)
-        .eq('propiedad_id', prop.id)
-      
-      prop.colaboradores = colaboradores?.map(c => ({
-        user_id: c.user_id,
-        nombre: (c as any).profiles?.nombre || 'Sin nombre',
-        email: (c as any).profiles?.email || 'Sin email'
-      })) || []
-      
-      const { data: fotoPortada } = await supabase
-        .from('property_images')
-        .select('url_thumbnail')
-        .eq('property_id', prop.id)
-        .eq('is_cover', true)
-        .single()
-      
-      prop.foto_portada = fotoPortada?.url_thumbnail || null
+        .select('propiedad_id')
+        .eq('user_id', userId)
+
+      if (errorCompartidas) {
+        throw errorCompartidas
+      }
+
+      let propiedadesCompartidasData: any[] = []
+      if (propiedadesCompartidas && propiedadesCompartidas.length > 0) {
+        const idsCompartidos = propiedadesCompartidas.map(p => p.propiedad_id)
+        const { data: datosCompartidos, error: errorDatosCompartidos } = await supabase
+          .from('propiedades')
+          .select('id, owner_id, nombre_propiedad, created_at')
+          .in('id', idsCompartidos)
+
+        if (errorDatosCompartidos) {
+          throw errorDatosCompartidos
+        }
+
+        propiedadesCompartidasData = datosCompartidos || []
+      }
+
+      const todasPropiedades = [
+        ...(propiedadesPropias || []).map(p => ({
+          ...p,
+          nombre: p.nombre_propiedad,
+          es_propio: true
+        })),
+        ...(propiedadesCompartidasData || []).map(p => ({
+          ...p,
+          nombre: p.nombre_propiedad,
+          es_propio: false
+        }))
+      ]
+
+      // ✅ FIX N+1 QUERY: Cargar colaboradores y fotos en batch (1 query para todos)
+      if (todasPropiedades.length > 0) {
+        const propIds = todasPropiedades.map(p => p.id)
+
+        // Query 1: Cargar TODOS los colaboradores en una sola query
+        const { data: todosColaboradores, error: errorColaboradores } = await supabase
+          .from('propiedades_colaboradores')
+          .select(`
+            propiedad_id,
+            user_id,
+            profiles:user_id (
+              nombre:nombre,
+              email:email
+            )
+          `)
+          .in('propiedad_id', propIds)
+
+        if (errorColaboradores) {
+          logger.error('Error loading colaboradores:', errorColaboradores)
+        }
+
+        // Query 2: Cargar TODAS las fotos de portada en una sola query
+        const { data: todasFotos, error: errorFotos } = await supabase
+          .from('property_images')
+          .select('property_id, url_thumbnail')
+          .in('property_id', propIds)
+          .eq('is_cover', true)
+
+        if (errorFotos) {
+          logger.error('Error loading fotos:', errorFotos)
+        }
+
+        // Mapear resultados a cada propiedad
+        todasPropiedades.forEach(prop => {
+          // Asignar colaboradores
+          prop.colaboradores = todosColaboradores
+            ?.filter(c => c.propiedad_id === prop.id)
+            .map(c => ({
+              user_id: c.user_id,
+              nombre: (c as any).profiles?.nombre || 'Sin nombre',
+              email: (c as any).profiles?.email || 'Sin email'
+            })) || []
+
+          // Asignar foto de portada
+          const foto = todasFotos?.find(f => f.property_id === prop.id)
+          prop.foto_portada = foto?.url_thumbnail || null
+        })
+      }
+
+      setPropiedades(todasPropiedades)
+      logger.debug(`Loaded ${todasPropiedades.length} properties successfully`)
+
+    } catch (error) {
+      logger.error('Error cargando propiedades:', error)
+      toast.error('Error al cargar propiedades')
+      setPropiedades([])
     }
-    
-    setPropiedades(todasPropiedades)
-  }
+  }, [toast])
 
   const abrirCompartir = (propiedad: Propiedad) => {
     setPropiedadSeleccionada(propiedad)

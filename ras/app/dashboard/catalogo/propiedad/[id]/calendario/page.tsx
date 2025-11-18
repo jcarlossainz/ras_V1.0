@@ -194,9 +194,14 @@ export default function CalendarioPropiedadPage() {
     setMesActual(nuevaFecha)
   }, [mesActual])
 
-  const volverPropiedad = useCallback(() => {
-    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/home`)
-  }, [router, propiedadId])
+  const volverCatalogo = useCallback(() => {
+    router.push('/dashboard/catalogo')
+  }, [router])
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }, [router])
 
   const getTipoIcon = (tipo: string) => {
     const iconos: { [key: string]: JSX.Element } = {
@@ -270,7 +275,10 @@ export default function CalendarioPropiedadPage() {
       <TopBar
         title={`Calendario - ${propiedad?.nombre_propiedad || 'Propiedad'}`}
         showBackButton
-        onBackClick={volverPropiedad}
+        onBackClick={volverCatalogo}
+        showUserInfo={true}
+        userEmail={user?.email}
+        onLogout={handleLogout}
       />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

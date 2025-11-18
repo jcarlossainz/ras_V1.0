@@ -331,9 +331,14 @@ export default function GaleriaPage() {
     [editingCaption, photos, toast]
   )
 
-  const volverPropiedad = useCallback(() => {
-    router.push(`/dashboard/catalogo/propiedad/${propertyId}/home`)
-  }, [router, propertyId])
+  const volverCatalogo = useCallback(() => {
+    router.push('/dashboard/catalogo')
+  }, [router])
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }, [router])
 
   // Filtrado de fotos
   const filteredPhotos = photos.filter(photo => {
@@ -352,7 +357,10 @@ export default function GaleriaPage() {
       <TopBar
         title={`Galería - ${property?.nombre_propiedad || 'Propiedad'}`}
         showBackButton={true}
-        onBack={volverPropiedad}
+        onBackClick={volverCatalogo}
+        showUserInfo={true}
+        userEmail={user?.email}
+        onLogout={handleLogout}
       />
 
       <main className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">

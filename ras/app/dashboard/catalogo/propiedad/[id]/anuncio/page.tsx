@@ -209,9 +209,14 @@ export default function AnuncioEditPage() {
     window.open(`/anuncio/${propiedadId}`, '_blank')
   }, [estadoAnuncio, propiedadId, toast])
 
-  const volverPropiedad = useCallback(() => {
-    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/home`)
-  }, [router, propiedadId])
+  const volverCatalogo = useCallback(() => {
+    router.push('/dashboard/catalogo')
+  }, [router])
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }, [router])
 
   if (loading || authLoading) {
     return <Loading message="Cargando anuncio..." />
@@ -243,7 +248,10 @@ export default function AnuncioEditPage() {
       <TopBar
         title={`Anuncio - ${propiedad.nombre_propiedad}`}
         showBackButton
-        onBackClick={volverPropiedad}
+        onBackClick={volverCatalogo}
+        showUserInfo={true}
+        userEmail={user?.email}
+        onLogout={handleLogout}
       />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

@@ -208,9 +208,14 @@ export default function InventarioPage() {
     }
   }, [inventory, toast, confirm])
 
-  const volverPropiedad = useCallback(() => {
-    router.push(`/dashboard/catalogo/propiedad/${propertyId}/home`)
-  }, [router, propertyId])
+  const volverCatalogo = useCallback(() => {
+    router.push('/dashboard/catalogo')
+  }, [router])
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }, [router])
 
   // Función para obtener el nombre real del espacio
   const getSpaceName = useCallback((spaceId: string | null): string => {
@@ -270,7 +275,10 @@ export default function InventarioPage() {
       <TopBar
         title={`Inventario - ${property.nombre_propiedad}`}
         showBackButton
-        onBackClick={volverPropiedad}
+        onBackClick={volverCatalogo}
+        showUserInfo={true}
+        userEmail={user?.email}
+        onLogout={handleLogout}
       />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

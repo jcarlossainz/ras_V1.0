@@ -266,9 +266,14 @@ ${ticket.proveedor ? `🏢 Proveedor: ${ticket.proveedor}` : ''}
     }
   }
 
-  const volverPropiedad = useCallback(() => {
-    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/home`)
-  }, [router, propiedadId])
+  const volverCatalogo = useCallback(() => {
+    router.push('/dashboard/catalogo')
+  }, [router])
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }, [router])
 
   if (authLoading) {
     return <Loading message="Cargando tickets..." />
@@ -280,7 +285,10 @@ ${ticket.proveedor ? `🏢 Proveedor: ${ticket.proveedor}` : ''}
         title={`Tickets - ${propiedad?.nombre_propiedad || 'Propiedad'}`}
         showBackButton
         showAddButton
-        onBackClick={volverPropiedad}
+        onBackClick={volverCatalogo}
+        showUserInfo={true}
+        userEmail={user?.email}
+        onLogout={handleLogout}
         onNuevoTicket={() => setShowNuevoTicketModal(true)}
       />
 

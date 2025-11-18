@@ -202,9 +202,14 @@ export default function BalancePropiedadPage() {
     setFechaHastaTabla(new Date().toISOString().split('T')[0])
   }, [])
 
-  const volverPropiedad = useCallback(() => {
-    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/home`)
-  }, [router, propiedadId])
+  const volverCatalogo = useCallback(() => {
+    router.push('/dashboard/catalogo')
+  }, [router])
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }, [router])
 
   const formatearFecha = (fecha: string) => {
     return new Date(fecha).toLocaleDateString('es-MX', {
@@ -264,7 +269,10 @@ export default function BalancePropiedadPage() {
       <TopBar
         title={`Balance - ${propiedad?.nombre_propiedad || 'Propiedad'}`}
         showBackButton
-        onBackClick={volverPropiedad}
+        onBackClick={volverCatalogo}
+        showUserInfo={true}
+        userEmail={user?.email}
+        onLogout={handleLogout}
       />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

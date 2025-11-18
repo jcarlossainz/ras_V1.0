@@ -359,6 +359,14 @@ export default function HomePropiedad() {
     router.push('/dashboard/catalogo')
   }, [router])
 
+  const handleLogout = useCallback(async () => {
+    const confirmed = await confirm.warning('¿Cerrar sesión?')
+    if (!confirmed) return
+
+    await supabase.auth.signOut()
+    router.push('/login')
+  }, [confirm, router])
+
   const irAGaleria = useCallback(() => {
     router.push(`/dashboard/catalogo/propiedad/${propiedadId}/galeria`)
   }, [router, propiedadId])
@@ -470,7 +478,14 @@ export default function HomePropiedad() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopBar title={propiedad.nombre_propiedad} showBackButton={true} onBack={volverCatalogo} />
+      <TopBar
+        title={propiedad.nombre_propiedad}
+        showBackButton={true}
+        onBackClick={volverCatalogo}
+        showUserInfo={true}
+        userEmail={user?.email}
+        onLogout={handleLogout}
+      />
 
       <main className="max-w-5xl mx-auto px-5 py-6">
         {/* Navegación rápida */}

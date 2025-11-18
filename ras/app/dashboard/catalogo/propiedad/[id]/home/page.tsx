@@ -426,6 +426,10 @@ export default function HomePropiedad() {
     router.push(`/dashboard/catalogo/propiedad/${propiedadId}/anuncio`)
   }, [router, propiedadId])
 
+  const irAInventario = useCallback(() => {
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/inventario`)
+  }, [router, propiedadId])
+
   const editarPropiedad = useCallback(() => {
     toast.info('Función de editar en desarrollo')
   }, [toast])
@@ -517,7 +521,7 @@ export default function HomePropiedad() {
 
       <main className="max-w-5xl mx-auto px-5 py-6">
         {/* Navegación rápida */}
-        <div className="mb-6 grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="mb-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <button
             onClick={irATickets}
             className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
@@ -608,8 +612,26 @@ export default function HomePropiedad() {
             </svg>
             <span className="font-semibold text-gray-900 group-hover:text-pink-600">Anuncio</span>
           </button>
+
+          <button
+            onClick={irAInventario}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-amber-500 hover:bg-amber-50 transition-all group"
+          >
+            <svg
+              className="w-5 h-5 text-gray-600 group-hover:text-amber-600"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+              <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+            <span className="font-semibold text-gray-900 group-hover:text-amber-600">Inventario</span>
+          </button>
         </div>
-        
+
         {/* Header con badges */}
         <div className="mb-6">
           {/* Badges de estados y tipo */}

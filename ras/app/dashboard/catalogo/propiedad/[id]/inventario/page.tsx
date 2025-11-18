@@ -1,164 +1,166 @@
-// 📁 src/app/dashboard/propiedad/[id]/inventario/page.tsx
-'use client';
+'use client'
 
-import { useParams, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase/client';
-import { useToast } from '@/hooks/useToast';
-import { useConfirm } from '@/components/ui/confirm-modal';
-import { logger } from '@/lib/logger';
-import TopBar from '@/components/ui/topbar';
-import Loading from '@/components/ui/loading';
-import EmptyState from '@/components/ui/emptystate';
-import EditItemModal from './components/EditItemModal';
+/**
+ * INVENTARIO - Vista Individual con IA
+ * Gestión de inventario con detección automática de objetos usando Vision API
+ */
+
+import { useParams, useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '@/lib/supabase/client'
+import { useToast } from '@/hooks/useToast'
+import { useAuth } from '@/hooks/useAuth'
+import { useConfirm } from '@/components/ui/confirm-modal'
+import { logger } from '@/lib/logger'
+import TopBar from '@/components/ui/topbar'
+import Loading from '@/components/ui/loading'
+import EmptyState from '@/components/ui/emptystate'
+import EditItemModal from './components/EditItemmodal'
 
 interface InventoryItem {
-  id: string;
-  object_name: string;
-  confidence: number;
-  space_type: string | null;
-  labels: string | null;
-  image_url: string;
-  image_id: string;
-  created_at: string;
+  id: string
+  object_name: string
+  confidence: number
+  space_type: string | null
+  labels: string | null
+  image_url: string
+  image_id: string
+  created_at: string
 }
 
 interface PropertyData {
-  id: string;
-  nombre: string;
-  tipo_propiedad: string;
+  id: string
+  nombre: string
+  tipo_propiedad: string
 }
 
 interface SpaceData {
-  id: string;
-  nombre: string;
+  id: string
+  nombre: string
 }
 
 export default function InventarioPage() {
-  const params = useParams();
-  const router = useRouter();
-  const propertyId = params.id as string;
-  const toast = useToast();
-  const confirm = useConfirm();
+  const params = useParams()
+  const router = useRouter()
+  const propertyId = params.id as string
+  const toast = useToast()
+  const confirm = useConfirm()
+  const { user, loading: authLoading, isAuthenticated } = useAuth()
 
-  const [user, setUser] = useState<any>(null);
-  const [property, setProperty] = useState<PropertyData | null>(null);
-  const [spaces, setSpaces] = useState<SpaceData[]>([]);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterSpace, setFilterSpace] = useState<string>('all');
-  
+  const [property, setProperty] = useState<PropertyData | null>(null)
+  const [spaces, setSpaces] = useState<SpaceData[]>([])
+  const [inventory, setInventory] = useState<InventoryItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterSpace, setFilterSpace] = useState<string>('all')
+
   // Estados para el modal de edición
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
 
   useEffect(() => {
-    checkUser();
-  }, [propertyId]);
-
-  const checkUser = async () => {
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser) { 
-      router.push('/login'); 
-      return; 
+    if (!authLoading && isAuthenticated) {
+      loadData()
     }
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
-    setUser({ ...profile, id: authUser.id });
-    loadData();
-  };
+  }, [authLoading, isAuthenticated, propertyId])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
-      setLoading(true);
+      setLoading(true)
 
       // Cargar propiedad
       const { data: propertyData, error: propError } = await supabase
         .from('propiedades')
         .select('id, nombre, tipo_propiedad')
         .eq('id', propertyId)
-        .single();
+        .single()
 
-      if (propError) throw propError;
-      setProperty(propertyData);
+      if (propError) {
+        console.error('Error cargando propiedad:', propError)
+        toast.error('No se pudo cargar la propiedad')
+        router.push('/dashboard/catalogo')
+        return
+      }
+
+      setProperty(propertyData)
 
       // Cargar espacios de la propiedad
       const { data: spacesData } = await supabase
         .from('property_spaces')
         .select('id, nombre')
         .eq('property_id', propertyId)
-        .order('nombre');
-      
-      setSpaces(spacesData || []);
+        .order('nombre')
+
+      setSpaces(spacesData || [])
 
       // Cargar inventario
-      await loadInventory();
+      await loadInventory()
 
     } catch (error: any) {
-      logger.error('Error cargando datos:', error);
-      toast.error('Error al cargar la propiedad');
+      logger.error('Error cargando datos:', error)
+      toast.error('Error al cargar la propiedad')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }, [propertyId, toast, router])
 
-  const loadInventory = async () => {
+  const loadInventory = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('property_inventory')
         .select('*')
         .eq('property_id', propertyId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
 
-      if (error) throw error;
-      setInventory(data || []);
+      if (error) throw error
+      setInventory(data || [])
     } catch (error: any) {
-      logger.error('Error cargando inventario:', error);
+      logger.error('Error cargando inventario:', error)
     }
-  };
+  }, [propertyId])
 
-  const handleAnalyzeAll = async () => {
+  const handleAnalyzeAll = useCallback(async () => {
     const confirmed = await confirm.warning(
       '¿Analizar todas las fotos de la galería?',
       'Este proceso puede tomar varios minutos dependiendo de la cantidad de imágenes.'
-    );
-    
-    if (!confirmed) return;
+    )
+
+    if (!confirmed) return
 
     try {
-      setAnalyzing(true);
+      setAnalyzing(true)
 
       const response = await fetch('/api/vision/analyze', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ propertyId })
-      });
+      })
 
-      const result = await response.json();
+      const result = await response.json()
 
       if (result.success) {
-        toast.success(result.message);
-        await loadInventory();
+        toast.success(result.message)
+        await loadInventory()
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error)
       }
 
     } catch (error: any) {
-      logger.error('Error en análisis:', error);
-      toast.error('Error al analizar imágenes');
+      logger.error('Error en análisis:', error)
+      toast.error('Error al analizar imágenes')
     } finally {
-      setAnalyzing(false);
+      setAnalyzing(false)
     }
-  };
+  }, [propertyId, loadInventory, toast, confirm])
 
-  const handleEditItem = (item: InventoryItem) => {
-    setEditingItem(item);
-    setShowEditModal(true);
-  };
+  const handleEditItem = useCallback((item: InventoryItem) => {
+    setEditingItem(item)
+    setShowEditModal(true)
+  }, [])
 
-  const handleSaveEdit = async (updatedItem: { object_name: string; labels: string; space_type: string }) => {
-    if (!editingItem) return;
+  const handleSaveEdit = useCallback(async (updatedItem: { object_name: string; labels: string; space_type: string }) => {
+    if (!editingItem) return
 
     try {
       const { error } = await supabase
@@ -168,139 +170,145 @@ export default function InventarioPage() {
           labels: updatedItem.labels || null,
           space_type: updatedItem.space_type || null
         })
-        .eq('id', editingItem.id);
+        .eq('id', editingItem.id)
 
-      if (error) throw error;
+      if (error) throw error
 
-      await loadInventory();
-      setShowEditModal(false);
-      setEditingItem(null);
-      toast.success('Item actualizado correctamente');
+      await loadInventory()
+      setShowEditModal(false)
+      setEditingItem(null)
+      toast.success('Item actualizado correctamente')
     } catch (error: any) {
-      logger.error('Error actualizando item:', error);
-      toast.error('Error al actualizar el item');
+      logger.error('Error actualizando item:', error)
+      toast.error('Error al actualizar el item')
     }
-  };
+  }, [editingItem, loadInventory, toast])
 
-  const handleDeleteItem = async (itemId: string) => {
+  const handleDeleteItem = useCallback(async (itemId: string) => {
     const confirmed = await confirm.danger(
       '¿Eliminar este item del inventario?',
       'Esta acción no se puede deshacer.'
-    );
-    
-    if (!confirmed) return;
+    )
+
+    if (!confirmed) return
 
     try {
       const { error } = await supabase
         .from('property_inventory')
         .delete()
-        .eq('id', itemId);
+        .eq('id', itemId)
 
-      if (error) throw error;
+      if (error) throw error
 
-      setInventory(inventory.filter(item => item.id !== itemId));
-      toast.success('Item eliminado correctamente');
+      setInventory(inventory.filter(item => item.id !== itemId))
+      toast.success('Item eliminado correctamente')
     } catch (error: any) {
-      logger.error('Error eliminando item:', error);
-      toast.error('Error al eliminar el item');
+      logger.error('Error eliminando item:', error)
+      toast.error('Error al eliminar el item')
     }
-  };
+  }, [inventory, toast, confirm])
 
-  const handleLogout = async () => {
-    const confirmed = await confirm.warning('¿Cerrar sesión?');
-    if (!confirmed) return;
-    
-    await supabase.auth.signOut();
-    router.push('/login');
-  };
+  const volverPropiedad = useCallback(() => {
+    router.push(`/dashboard/catalogo/propiedad/${propertyId}/home`)
+  }, [router, propertyId])
 
   // Función para obtener el nombre real del espacio
-  const getSpaceName = (spaceId: string | null): string => {
-    if (!spaceId) return 'Sin espacio';
-    
-    const space = spaces.find(s => s.id === spaceId);
-    return space ? space.nombre : 'Espacio desconocido';
-  };
+  const getSpaceName = useCallback((spaceId: string | null): string => {
+    if (!spaceId) return 'Sin espacio'
+
+    const space = spaces.find(s => s.id === spaceId)
+    return space ? space.nombre : 'Espacio desconocido'
+  }, [spaces])
 
   // Filtrar inventario
   const filteredInventory = inventory.filter((item) => {
     // Filtro de búsqueda
-    const matchesSearch = 
+    const matchesSearch =
       item.object_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.labels && item.labels.toLowerCase().includes(searchQuery.toLowerCase()));
+      (item.labels && item.labels.toLowerCase().includes(searchQuery.toLowerCase()))
 
     // Filtro por espacio
-    const matchesSpace = 
+    const matchesSpace =
       filterSpace === 'all' ||
       (filterSpace === 'sin-espacio' && !item.space_type) ||
-      item.space_type === filterSpace;
+      item.space_type === filterSpace
 
-    return matchesSearch && matchesSpace;
-  });
+    return matchesSearch && matchesSpace
+  })
 
   // Obtener espacios únicos del inventario
   const uniqueSpaces = Array.from(new Set(
     inventory
       .filter(item => item.space_type)
       .map(item => item.space_type as string)
-  ));
+  ))
 
-  if (loading) {
-    return <Loading />;
+  if (loading || authLoading) {
+    return <Loading message="Cargando inventario..." />
   }
 
   if (!property) {
     return (
-      <EmptyState 
-        icon={
-          <svg className="w-12 h-12 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-        }
-        title="Propiedad no encontrada"
-        description="No se pudo cargar la información de la propiedad"
-      />
-    );
+      <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema flex items-center justify-center">
+        <EmptyState
+          icon={
+            <svg className="w-12 h-12 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          }
+          title="Propiedad no encontrada"
+          description="No se pudo cargar la información de la propiedad"
+        />
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema">
-      <TopBar 
-        title={`Inventario - ${property?.nombre || ''}`}
-        showBackButton={true}
-        showUserInfo={true}
-        userEmail={user?.email}
-        onLogout={handleLogout}
+      <TopBar
+        title={`Inventario - ${property.nombre}`}
+        showBackButton
+        onBackClick={volverPropiedad}
       />
 
-      <main className="max-w-5xl mx-auto px-4 py-8">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Barra de acción superior */}
         {inventory.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 mb-6">
-            <div className="flex items-center justify-between">
-              {/* Botón Analizar a la IZQUIERDA */}
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              {/* Botón Analizar */}
               <button
                 onClick={handleAnalyzeAll}
                 disabled={analyzing}
-                className="px-6 py-3 bg-gradient-to-r from-ras-azul to-ras-turquesa text-white rounded-xl hover:shadow-xl transition-all disabled:bg-gray-400 font-semibold"
+                className="px-6 py-3 bg-gradient-to-r from-ras-azul to-ras-turquesa text-white rounded-xl hover:shadow-lg transition-all disabled:bg-gray-400 font-semibold font-poppins"
               >
-                {analyzing ? 'Analizando...' : '🔍 Analizar Galería'}
+                {analyzing ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                    Analizando...
+                  </span>
+                ) : (
+                  '🔍 Analizar Galería con IA'
+                )}
               </button>
-              
-              {/* Total de Items a la DERECHA */}
+
+              {/* Total de Items */}
               <div className="text-right">
-                <h3 className="text-sm font-medium text-gray-600 mb-1">Total de Items</h3>
-                <p className="text-4xl font-bold text-ras-azul">{inventory.length}</p>
+                <h3 className="text-sm font-semibold text-gray-600 mb-1 font-poppins">Total de Items</h3>
+                <p className="text-4xl font-bold text-ras-azul font-poppins">{inventory.length}</p>
               </div>
             </div>
           </div>
         )}
 
         {/* Barra de búsqueda y filtros */}
-        <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-300 p-4 mb-6">
-          <div className="flex items-center gap-4">
+        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 mb-6">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
             {/* Buscador */}
             <div className="flex-1">
               <div className="relative">
@@ -309,7 +317,7 @@ export default function InventarioPage() {
                   placeholder="Buscar por objeto o etiquetas..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-lg focus:border-ras-turquesa focus:outline-none transition-colors"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:border-ras-turquesa focus:outline-none focus:ring-2 focus:ring-ras-turquesa transition-colors"
                 />
                 <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="11" cy="11" r="8"/>
@@ -323,7 +331,7 @@ export default function InventarioPage() {
               <select
                 value={filterSpace}
                 onChange={(e) => setFilterSpace(e.target.value)}
-                className="appearance-none bg-white border-2 border-gray-200 rounded-lg px-4 py-2 pr-10 font-medium text-gray-700 hover:border-ras-turquesa focus:border-ras-turquesa focus:outline-none transition-colors cursor-pointer"
+                className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-10 font-medium text-gray-700 hover:border-ras-turquesa focus:border-ras-turquesa focus:outline-none focus:ring-2 focus:ring-ras-turquesa transition-colors cursor-pointer min-w-[200px]"
               >
                 <option value="all">📍 Todos los espacios</option>
                 <option value="sin-espacio">🔹 Sin espacio</option>
@@ -342,10 +350,10 @@ export default function InventarioPage() {
 
         {/* Tabla de inventario */}
         {filteredInventory.length > 0 ? (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
             {/* Encabezados */}
-            <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-6 py-3">
-              <div className="grid grid-cols-12 gap-4 items-center text-sm font-semibold text-gray-600">
+            <div className="bg-gradient-to-r from-ras-azul to-ras-turquesa text-white px-6 py-3">
+              <div className="grid grid-cols-12 gap-4 items-center text-xs font-semibold uppercase font-poppins">
                 <div className="col-span-1">Imagen</div>
                 <div className="col-span-3">Objeto</div>
                 <div className="col-span-3">Etiquetas</div>
@@ -357,21 +365,27 @@ export default function InventarioPage() {
             {/* Filas */}
             <div className="divide-y divide-gray-100">
               {filteredInventory.map((item) => (
-                <div key={item.id} className="px-6 py-4 hover:bg-gray-50 transition-all">
+                <div key={item.id} className="px-6 py-4 hover:bg-ras-turquesa/5 transition-colors">
                   <div className="grid grid-cols-12 gap-4 items-center">
                     {/* Imagen */}
                     <div className="col-span-1">
                       <img
                         src={item.image_url}
                         alt={item.object_name}
-                        className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200"
+                        className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200 shadow-sm"
+                        onError={(e) => {
+                          e.currentTarget.src = "https://via.placeholder.com/64x64/f3f4f6/9ca3af?text=?"
+                        }}
                       />
                     </div>
 
                     {/* Objeto */}
                     <div className="col-span-3">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-semibold text-gray-900 font-poppins">
                         {item.object_name}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Confianza: {(item.confidence * 100).toFixed(0)}%
                       </div>
                     </div>
 
@@ -382,25 +396,25 @@ export default function InventarioPage() {
                           {item.labels.split(',').slice(0, 3).map((label, idx) => (
                             <span
                               key={idx}
-                              className="px-2 py-1 text-xs rounded-lg bg-purple-100 text-purple-700 font-medium"
+                              className="px-2 py-1 text-xs rounded-lg bg-purple-100 text-purple-700 font-medium border border-purple-200"
                             >
                               {label.trim()}
                             </span>
                           ))}
                           {item.labels.split(',').length > 3 && (
-                            <span className="px-2 py-1 text-xs rounded-lg bg-gray-100 text-gray-600">
+                            <span className="px-2 py-1 text-xs rounded-lg bg-gray-100 text-gray-600 border border-gray-200">
                               +{item.labels.split(',').length - 3}
                             </span>
                           )}
                         </div>
                       ) : (
-                        <span className="text-sm text-gray-400">Sin etiquetas</span>
+                        <span className="text-sm text-gray-400 italic">Sin etiquetas</span>
                       )}
                     </div>
 
-                    {/* Espacio - MOSTRANDO NOMBRE REAL */}
+                    {/* Espacio */}
                     <div className="col-span-3">
-                      <span className="px-3 py-1 text-sm rounded-lg bg-blue-100 text-blue-700 font-medium">
+                      <span className="px-3 py-1 text-sm rounded-lg bg-blue-100 text-blue-700 font-medium border border-blue-200">
                         {getSpaceName(item.space_type)}
                       </span>
                     </div>
@@ -437,19 +451,26 @@ export default function InventarioPage() {
                 </div>
               ))}
             </div>
+
+            {/* Footer con total */}
+            <div className="bg-gray-50 border-t border-gray-200 px-6 py-3">
+              <div className="text-sm font-semibold text-gray-600 font-poppins">
+                Mostrando {filteredInventory.length} de {inventory.length} item{inventory.length !== 1 ? 's' : ''}
+              </div>
+            </div>
           </div>
         ) : (
-          <EmptyState 
+          <EmptyState
             icon={
-              <svg className="w-12 h-12 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg className="w-16 h-16 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
                 <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
                 <line x1="12" y1="22.08" x2="12" y2="12"/>
               </svg>
             }
             title={inventory.length === 0 ? "No hay items en el inventario" : "No se encontraron resultados"}
-            description={inventory.length === 0 ? "Haz clic en 'Analizar Galería' para detectar objetos automáticamente" : "Intenta con otra búsqueda o cambia los filtros"}
-            actionLabel={inventory.length === 0 ? "🔍 Analizar Galería" : undefined}
+            description={inventory.length === 0 ? "Haz clic en 'Analizar Galería con IA' para detectar objetos automáticamente" : "Intenta con otra búsqueda o cambia los filtros"}
+            actionLabel={inventory.length === 0 ? "🔍 Analizar Galería con IA" : undefined}
             onAction={inventory.length === 0 ? handleAnalyzeAll : undefined}
           />
         )}
@@ -461,12 +482,12 @@ export default function InventarioPage() {
           item={editingItem}
           spaces={spaces}
           onClose={() => {
-            setShowEditModal(false);
-            setEditingItem(null);
+            setShowEditModal(false)
+            setEditingItem(null)
           }}
           onSave={handleSaveEdit}
         />
       )}
     </div>
-  );
+  )
 }

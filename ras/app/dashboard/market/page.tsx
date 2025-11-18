@@ -14,7 +14,7 @@ import EmptyState from '@/components/ui/emptystate'
 interface Propiedad {
   id: string
   user_id: string
-  nombre: string
+  nombre_propiedad: string
   tipo_propiedad: string
   estados: string[]
   codigo_postal: string | null
@@ -245,28 +245,28 @@ export default function MarketPage() {
         {/* Grid de tarjetas - 3 COLUMNAS */}
         {propiedades.filter(prop => {
           // Filtro búsqueda
-          const matchBusqueda = busqueda === '' || 
-            prop.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+          const matchBusqueda = busqueda === '' ||
+            prop.nombre_propiedad.toLowerCase().includes(busqueda.toLowerCase()) ||
             (prop.codigo_postal && prop.codigo_postal.includes(busqueda))
-          
+
           // Filtro estado
-          const matchEstado = 
+          const matchEstado =
             filtroEstado === 'todos' ||
             (filtroEstado === 'borrador' && !prop.estado_anuncio) ||
             prop.estado_anuncio === filtroEstado
-          
+
           // Filtro operación
           const operaciones = getOperacionTipo(prop)
-          const matchOperacion = 
+          const matchOperacion =
             filtroOperacion === 'todos' ||
             operaciones.includes(filtroOperacion)
-          
+
           return matchBusqueda && matchEstado && matchOperacion
         }).length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {propiedades.filter(prop => {
-              const matchBusqueda = busqueda === '' || 
-                prop.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+              const matchBusqueda = busqueda === '' ||
+                prop.nombre_propiedad.toLowerCase().includes(busqueda.toLowerCase()) ||
                 (prop.codigo_postal && prop.codigo_postal.includes(busqueda))
               
               const matchEstado = 
@@ -298,7 +298,7 @@ export default function MarketPage() {
                     {prop.foto_portada ? (
                       <img
                         src={prop.foto_portada}
-                        alt={prop.nombre}
+                        alt={prop.nombre_propiedad}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
                           e.currentTarget.src = "https://via.placeholder.com/400x300/f3f4f6/9ca3af?text=Sin+foto"
@@ -311,12 +311,12 @@ export default function MarketPage() {
                         </svg>
                       </div>
                     )}
-                    
+
                     {/* Badge Activo/Inactivo */}
                     <div className="absolute top-3 right-3">
                       <span className={`px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-sm ${
-                        isActivo 
-                          ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' 
+                        isActivo
+                          ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
                           : 'bg-gray-200/90 text-gray-700'
                       }`}>
                         {isActivo ? 'Activo' : 'Inactivo'}
@@ -327,11 +327,11 @@ export default function MarketPage() {
                   {/* Contenido */}
                   <div className="p-4">
                     {/* Título */}
-                    <h3 
+                    <h3
                       onClick={() => abrirAnuncio(prop.id)}
                       className="text-lg font-bold text-gray-900 mb-1 cursor-pointer hover:text-ras-azul line-clamp-1"
                     >
-                      {prop.nombre}
+                      {prop.nombre_propiedad}
                     </h3>
                     
                     {/* Ubicación y código */}

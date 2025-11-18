@@ -15,7 +15,7 @@ import EmptyState from '@/components/ui/emptystate'
 interface Propiedad {
   id: string
   owner_id: string
-  nombre: string
+  nombre_propiedad: string
   codigo_postal: string | null
   created_at: string
   es_propio: boolean
@@ -79,15 +79,13 @@ export default function CatalogoPage() {
     }
     
     const todasPropiedades = [
-      ...(propiedadesPropias || []).map(p => ({ 
-        ...p, 
-        nombre: p.nombre_propiedad,
-        es_propio: true 
+      ...(propiedadesPropias || []).map(p => ({
+        ...p,
+        es_propio: true
       })),
-      ...(propiedadesCompartidasData || []).map(p => ({ 
-        ...p, 
-        nombre: p.nombre_propiedad,
-        es_propio: false 
+      ...(propiedadesCompartidasData || []).map(p => ({
+        ...p,
+        es_propio: false
       }))
     ]
     
@@ -201,13 +199,13 @@ export default function CatalogoPage() {
   }
 
   const propiedadesFiltradas = propiedades.filter(prop => {
-    const cumpleBusqueda = prop.nombre.toLowerCase().includes(busqueda.toLowerCase())
-    
-    const cumpleFiltro = 
+    const cumpleBusqueda = prop.nombre_propiedad.toLowerCase().includes(busqueda.toLowerCase())
+
+    const cumpleFiltro =
       filtroPropiedad === 'todos' ||
       (filtroPropiedad === 'propios' && prop.es_propio) ||
       (filtroPropiedad === 'compartidos' && !prop.es_propio)
-    
+
     return cumpleBusqueda && cumpleFiltro
   })
 
@@ -300,9 +298,9 @@ export default function CatalogoPage() {
                 >
                   <div className="flex items-center gap-4">
                     <div>
-                      <img 
+                      <img
                         src={prop.foto_portada || "https://via.placeholder.com/80x60/f3f4f6/9ca3af?text=Sin+foto"}
-                        alt={prop.nombre}
+                        alt={prop.nombre_propiedad}
                         className="w-20 h-16 object-cover rounded-lg border-2 border-gray-200"
                         onError={(e) => {
                           e.currentTarget.src = "https://via.placeholder.com/80x60/f3f4f6/9ca3af?text=Sin+foto"
@@ -313,7 +311,7 @@ export default function CatalogoPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h3 className="text-lg font-bold text-gray-800 font-poppins">
-                          {prop.nombre}
+                          {prop.nombre_propiedad}
                         </h3>
                         
                         <span 

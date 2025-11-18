@@ -7,7 +7,7 @@ interface NuevoTicketProps {
   isOpen: boolean;
   onClose: () => void;
   propiedadId?: string;
-  propiedades: { id: string; nombre: string }[];
+  propiedades: { id: string; nombre_propiedad: string }[];
   onTicketCreado?: () => void;
 }
 
@@ -162,7 +162,7 @@ export default function NuevoTicket({
                 <option value="">Selecciona una propiedad</option>
                 {propiedades.map((prop) => (
                   <option key={prop.id} value={prop.id}>
-                    {prop.nombre}
+                    {prop.nombre_propiedad}
                   </option>
                 ))}
               </select>

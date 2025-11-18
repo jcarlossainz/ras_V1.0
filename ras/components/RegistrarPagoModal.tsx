@@ -13,7 +13,7 @@ interface RegistrarPagoModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
-  propiedades: { id: string; nombre: string }[]
+  propiedades: { id: string; nombre_propiedad: string }[]
   pagoExistente?: {
     id: string
     fecha_pago: string
@@ -289,7 +289,7 @@ export default function RegistrarPagoModal({
               >
                 <option value="">Seleccionar propiedad...</option>
                 {propiedades.map(prop => (
-                  <option key={prop.id} value={prop.id}>{prop.nombre}</option>
+                  <option key={prop.id} value={prop.id}>{prop.nombre_propiedad}</option>
                 ))}
               </select>
             </div>

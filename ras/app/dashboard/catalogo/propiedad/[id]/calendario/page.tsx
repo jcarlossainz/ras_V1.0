@@ -35,7 +35,7 @@ interface DiaCalendario {
 
 interface Propiedad {
   id: string
-  nombre: string
+  nombre_propiedad: string
   tipo_propiedad?: string
 }
 
@@ -84,7 +84,7 @@ export default function CalendarioPropiedadPage() {
       // Cargar propiedad
       const { data: propData, error: propError } = await supabase
         .from('propiedades')
-        .select('id, nombre, tipo_propiedad')
+        .select('id, nombre_propiedad, tipo_propiedad')
         .eq('id', propiedadId)
         .single()
 
@@ -133,7 +133,7 @@ export default function CalendarioPropiedadPage() {
         servicio_nombre: pago.servicios_inmueble.nombre,
         tipo_servicio: pago.servicios_inmueble.tipo_servicio,
         propiedad_id: pago.propiedad_id,
-        propiedad_nombre: propData.nombre
+        propiedad_nombre: propData.nombre_propiedad
       }))
 
       setPagos(pagosTransformados)
@@ -273,7 +273,7 @@ export default function CalendarioPropiedadPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema">
       <TopBar
-        title={`Calendario - ${propiedad?.nombre || 'Propiedad'}`}
+        title={`Calendario - ${propiedad?.nombre_propiedad || 'Propiedad'}`}
         showBackButton
         onBackClick={volverCatalogo}
         showUserInfo={true}

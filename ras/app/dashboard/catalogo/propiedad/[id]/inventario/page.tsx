@@ -25,7 +25,7 @@ interface InventoryItem {
 
 interface PropertyData {
   id: string;
-  nombre: string;
+  nombre_propiedad: string;
   tipo_propiedad: string;
 }
 
@@ -76,7 +76,7 @@ export default function InventarioPage() {
       // Cargar propiedad
       const { data: propertyData, error: propError } = await supabase
         .from('propiedades')
-        .select('id, nombre, tipo_propiedad')
+        .select('id, nombre_propiedad, tipo_propiedad')
         .eq('id', propertyId)
         .single();
 
@@ -267,8 +267,8 @@ export default function InventarioPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema">
-      <TopBar 
-        title={`Inventario - ${property?.nombre || ''}`}
+      <TopBar
+        title={`Inventario - ${property?.nombre_propiedad || ''}`}
         showBackButton={true}
         showUserInfo={true}
         userEmail={user?.email}

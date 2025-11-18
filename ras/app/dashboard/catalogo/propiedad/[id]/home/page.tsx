@@ -411,7 +411,7 @@ export default function HomePropiedad() {
   }
 
   const abrirCuentas = () => {
-    router.push(`/dashboard/propiedad/${propiedadId}/cuentas`)
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/cuentas`)
   }
 
   const editarPropiedad = () => {
@@ -447,7 +447,7 @@ export default function HomePropiedad() {
       toast.success('Propiedad duplicada correctamente')
       setShowDuplicarModal(false)
       setNombreDuplicado('')
-      router.push(`/dashboard/propiedad/${data.id}/home`)
+      router.push(`/dashboard/catalogo/propiedad/${data.id}/home`)
     } catch (error: any) {
       logger.error('Error al duplicar propiedad:', error)
       toast.error('Error al duplicar la propiedad')

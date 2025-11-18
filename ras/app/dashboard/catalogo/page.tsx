@@ -126,27 +126,27 @@ export default function CatalogoPage() {
   }
 
   const abrirHome = (propiedadId: string) => {
-    router.push(`/dashboard/propiedad/${propiedadId}/home`)
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/home`)
   }
 
   const abrirGaleria = (propiedadId: string) => {
-    router.push(`/dashboard/propiedad/${propiedadId}/galeria`)
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/galeria`)
   }
 
   const abrirInventario = (propiedadId: string) => {
-    router.push(`/dashboard/propiedad/${propiedadId}/inventario`)
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/inventario`)
   }
 
   const abrirTickets = (propiedadId: string) => {
-    router.push(`/dashboard/propiedad/${propiedadId}/tickets`)
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/tickets`)
   }
 
   const abrirCalendario = (propiedadId: string) => {
-    router.push(`/dashboard/propiedad/${propiedadId}/calendario`)
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/calendario`)
   }
 
   const abrirBalance = (propiedadId: string) => {
-    router.push(`/dashboard/propiedad/${propiedadId}/cuentas`)
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/cuentas`)
   }
 
   const abrirAnuncio = (propiedadId: string) => {

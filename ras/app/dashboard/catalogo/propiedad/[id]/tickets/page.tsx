@@ -301,7 +301,7 @@ export default function CalendarioPagosPage() {
                 : `No hay pagos en estado "${filtro}"`
             }
             actionLabel="Gestionar Servicios"
-            onAction={() => router.push(`/dashboard/propiedad/${propiedadId}`)}
+            onAction={() => router.push(`/dashboard/catalogo/propiedad/${propiedadId}/home`)}
           />
         ) : (
           <div className="space-y-4">

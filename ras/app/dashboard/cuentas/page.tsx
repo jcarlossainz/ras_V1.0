@@ -897,7 +897,7 @@ export default function CuentasGlobalPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => router.push(`/dashboard/propiedad/${mov.propiedad_id}/cuentas`)}
+                            onClick={() => router.push(`/dashboard/catalogo/propiedad/${mov.propiedad_id}/cuentas`)}
                             className="p-2 hover:bg-ras-turquesa/10 rounded-lg transition-colors"
                             title="Ver detalles"
                           >

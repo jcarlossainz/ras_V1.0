@@ -816,7 +816,7 @@ export default function CalendarioGlobalPage() {
                 </div>
                 <button
                   onClick={() => {
-                    router.push(`/dashboard/propiedad/${pagoSeleccionado.propiedad_id}/tickets`)
+                    router.push(`/dashboard/catalogo/propiedad/${pagoSeleccionado.propiedad_id}/tickets`)
                     setPagoSeleccionado(null)
                   }}
                   className="w-full py-3.5 bg-gradient-to-r from-ras-azul to-ras-turquesa text-white rounded-xl font-semibold hover:shadow-lg hover:scale-[1.02] transition-all font-poppins flex items-center justify-center gap-2"

@@ -599,65 +599,32 @@ export default function HomePropiedad() {
               </div>
             </div>
 
-            {/* ✅ Información de Renta Largo Plazo */}
-            {propiedad.datos_renta_largo_plazo ? (
+            {/* SECCIÓN: Servicios de la propiedad */}
+            {propiedad.servicios && propiedad.servicios.length > 0 ? (
               <div className="bg-white rounded-xl shadow-sm border-2 border-gray-200 p-6">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                    <svg className="w-6 h-6 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <div className="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-teal-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                     </svg>
                   </div>
-                  <h2 className="text-xl font-bold text-gray-900 font-poppins">Renta Largo Plazo</h2>
+                  <h2 className="text-xl font-bold text-gray-900 font-poppins">Servicios</h2>
                 </div>
-                
-                <div className="space-y-3">
-                  {propiedad.datos_renta_largo_plazo.fecha_inicio_contrato && (
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-gray-600 font-medium">Fecha de inicio:</span>
-                      <span className="text-gray-900 font-semibold">
-                        {new Date(propiedad.datos_renta_largo_plazo.fecha_inicio_contrato).toLocaleDateString('es-MX')}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {propiedad.datos_renta_largo_plazo.frecuencia_pago && (
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-gray-600 font-medium">Frecuencia de pago:</span>
-                      <span className="text-gray-900 font-semibold capitalize">
-                        {propiedad.datos_renta_largo_plazo.frecuencia_pago}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {propiedad.datos_renta_largo_plazo.dia_pago && (
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-gray-600 font-medium">Día de pago:</span>
-                      <span className="text-gray-900 font-semibold">
-                        Día {propiedad.datos_renta_largo_plazo.dia_pago}
-                      </span>
-                    </div>
-                  )}
 
-                  {propiedad.datos_renta_largo_plazo.requisitos_renta && propiedad.datos_renta_largo_plazo.requisitos_renta.length > 0 && (
-                    <div className="pt-2">
-                      <span className="text-sm text-gray-600 font-medium block mb-2">Requisitos:</span>
-                      <div className="flex flex-wrap gap-2">
-                        {propiedad.datos_renta_largo_plazo.requisitos_renta.map((req: string, idx: number) => (
-                          <span key={idx} className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium">
-                            {req}
-                          </span>
-                        ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {propiedad.servicios.map((servicio, idx) => (
+                    <div key={idx} className="p-3 bg-teal-50 rounded-lg border border-teal-200">
+                      <div className="flex items-center gap-2 mb-1">
+                        <svg className="w-4 h-4 text-teal-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <p className="text-sm font-bold text-gray-900">{servicio.nombre}</p>
                       </div>
+                      {servicio.proveedor && (
+                        <p className="text-xs text-gray-600 ml-6">📍 {servicio.proveedor}</p>
+                      )}
                     </div>
-                  )}
-
-                  {!propiedad.datos_renta_largo_plazo.fecha_inicio_contrato && 
-                   !propiedad.datos_renta_largo_plazo.frecuencia_pago && 
-                   !propiedad.datos_renta_largo_plazo.dia_pago && 
-                   (!propiedad.datos_renta_largo_plazo.requisitos_renta || propiedad.datos_renta_largo_plazo.requisitos_renta.length === 0) && (
-                    <p className="text-gray-500 text-center py-8 italic">No hay información de renta registrada</p>
-                  )}
+                  ))}
                 </div>
               </div>
             ) : (
@@ -665,12 +632,12 @@ export default function HomePropiedad() {
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
                     <svg className="w-6 h-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                     </svg>
                   </div>
-                  <h2 className="text-xl font-bold text-gray-900 font-poppins">Renta Largo Plazo</h2>
+                  <h2 className="text-xl font-bold text-gray-900 font-poppins">Servicios</h2>
                 </div>
-                <p className="text-gray-500 text-center py-8 italic">No hay información de renta registrada</p>
+                <p className="text-gray-500 text-center py-8 italic">No hay servicios registrados</p>
               </div>
             )}
           </div>
@@ -746,32 +713,65 @@ export default function HomePropiedad() {
             </div>
           )}
 
-          {/* SECCIÓN: Servicios de la propiedad */}
-          {propiedad.servicios && propiedad.servicios.length > 0 && (
+          {/* ✅ Información de Renta Largo Plazo */}
+          {propiedad.datos_renta_largo_plazo && (
             <div className="bg-white rounded-xl shadow-sm border-2 border-gray-200 p-6">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center">
-                  <svg className="w-6 h-6 text-teal-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
-                <h2 className="text-xl font-bold text-gray-900 font-poppins">Servicios</h2>
+                <h2 className="text-xl font-bold text-gray-900 font-poppins">Renta Largo Plazo</h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {propiedad.servicios.map((servicio, idx) => (
-                  <div key={idx} className="p-4 bg-teal-50 rounded-lg border border-teal-200">
-                    <div className="flex items-center gap-2 mb-1">
-                      <svg className="w-4 h-4 text-teal-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      <p className="text-base font-bold text-gray-900">{servicio.nombre}</p>
-                    </div>
-                    {servicio.proveedor && (
-                      <p className="text-sm text-gray-600 ml-6">📍 {servicio.proveedor}</p>
-                    )}
+              <div className="space-y-3">
+                {propiedad.datos_renta_largo_plazo.fecha_inicio_contrato && (
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-gray-600 font-medium">Fecha de inicio:</span>
+                    <span className="text-gray-900 font-semibold">
+                      {new Date(propiedad.datos_renta_largo_plazo.fecha_inicio_contrato).toLocaleDateString('es-MX')}
+                    </span>
                   </div>
-                ))}
+                )}
+
+                {propiedad.datos_renta_largo_plazo.frecuencia_pago && (
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-gray-600 font-medium">Frecuencia de pago:</span>
+                    <span className="text-gray-900 font-semibold capitalize">
+                      {propiedad.datos_renta_largo_plazo.frecuencia_pago}
+                    </span>
+                  </div>
+                )}
+
+                {propiedad.datos_renta_largo_plazo.dia_pago && (
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-gray-600 font-medium">Día de pago:</span>
+                    <span className="text-gray-900 font-semibold">
+                      Día {propiedad.datos_renta_largo_plazo.dia_pago}
+                    </span>
+                  </div>
+                )}
+
+                {propiedad.datos_renta_largo_plazo.requisitos_renta && propiedad.datos_renta_largo_plazo.requisitos_renta.length > 0 && (
+                  <div className="pt-2">
+                    <span className="text-sm text-gray-600 font-medium block mb-2">Requisitos:</span>
+                    <div className="flex flex-wrap gap-2">
+                      {propiedad.datos_renta_largo_plazo.requisitos_renta.map((req: string, idx: number) => (
+                        <span key={idx} className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-medium">
+                          {req}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!propiedad.datos_renta_largo_plazo.fecha_inicio_contrato &&
+                 !propiedad.datos_renta_largo_plazo.frecuencia_pago &&
+                 !propiedad.datos_renta_largo_plazo.dia_pago &&
+                 (!propiedad.datos_renta_largo_plazo.requisitos_renta || propiedad.datos_renta_largo_plazo.requisitos_renta.length === 0) && (
+                  <p className="text-gray-500 text-center py-8 italic">No hay información de renta registrada</p>
+                )}
               </div>
             </div>
           )}

@@ -105,7 +105,7 @@ export default function CuentasGlobalPage() {
       // Cargar propiedades
       const { data: propsPropias } = await supabase
         .from('propiedades')
-        .select('id, nombre')
+        .select('id, nombre_propiedad')
         .eq('user_id', userId)
 
       const { data: propsCompartidas } = await supabase
@@ -118,7 +118,7 @@ export default function CuentasGlobalPage() {
         const ids = propsCompartidas.map(p => p.propiedad_id)
         const { data } = await supabase
           .from('propiedades')
-          .select('id, nombre')
+          .select('id, nombre_propiedad')
           .in('id', ids)
         propsCompartidasData = data || []
       }
@@ -158,7 +158,7 @@ export default function CuentasGlobalPage() {
         const propiedad = todasPropiedades.find(p => p.id === pago.propiedad_id)
         return {
           id: pago.id,
-          propiedad_nombre: propiedad?.nombre || 'Sin nombre',
+          propiedad_nombre: propiedad?.nombre_propiedad || 'Sin nombre',
           tipo: 'egreso' as const,
           titulo: pago.servicios_inmueble.nombre,
           monto: pago.monto_estimado,
@@ -438,7 +438,7 @@ export default function CuentasGlobalPage() {
                             }}
                             className="w-4 h-4 text-ras-turquesa border-gray-300 rounded focus:ring-ras-turquesa"
                           />
-                          <span className="ml-3 text-sm text-gray-700">{prop.nombre}</span>
+                          <span className="ml-3 text-sm text-gray-700">{prop.nombre_propiedad}</span>
                         </label>
                       ))}
                     </div>
@@ -793,7 +793,7 @@ export default function CuentasGlobalPage() {
                                   propiedadFiltroTabla === prop.id ? 'bg-ras-turquesa/10 font-semibold text-ras-azul' : 'text-gray-700'
                                 }`}
                               >
-                                {prop.nombre}
+                                {prop.nombre_propiedad}
                               </button>
                             ))}
                           </div>

@@ -111,7 +111,7 @@ export default function CalendarioGlobalPage() {
       // Cargar propiedades
       const { data: propsPropias } = await supabase
         .from('propiedades')
-        .select('id, nombre, user_id')
+        .select('id, nombre_propiedad, user_id')
         .eq('user_id', userId)
 
       const { data: propsCompartidas } = await supabase
@@ -124,7 +124,7 @@ export default function CalendarioGlobalPage() {
         const ids = propsCompartidas.map(p => p.propiedad_id)
         const { data } = await supabase
           .from('propiedades')
-          .select('id, nombre, user_id')
+          .select('id, nombre_propiedad, user_id')
           .in('id', ids)
         propsCompartidasData = data || []
       }
@@ -194,7 +194,7 @@ export default function CalendarioGlobalPage() {
           servicio_nombre: pago.servicios_inmueble.nombre,
           tipo_servicio: pago.servicios_inmueble.tipo_servicio,
           propiedad_id: pago.propiedad_id,
-          propiedad_nombre: propiedad?.nombre || 'Sin nombre',
+          propiedad_nombre: propiedad?.nombre_propiedad || 'Sin nombre',
           propietario_id: propiedad?.user_id || '',
           propietario_nombre: propietario?.nombre || 'Desconocido'
         }
@@ -471,7 +471,7 @@ export default function CalendarioGlobalPage() {
                           onChange={() => togglePropietario(prop.id)}
                           className="w-4 h-4 text-ras-turquesa border-gray-300 rounded focus:ring-ras-turquesa"
                         />
-                        <span className="ml-3 text-sm text-gray-700">{prop.nombre}</span>
+                        <span className="ml-3 text-sm text-gray-700">{prop.nombre_propiedad}</span>
                       </label>
                     ))}
                   </div>
@@ -524,7 +524,7 @@ export default function CalendarioGlobalPage() {
                             onChange={() => togglePropiedad(prop.id)}
                             className="w-4 h-4 text-ras-turquesa border-gray-300 rounded focus:ring-ras-turquesa"
                           />
-                          <span className="ml-3 text-sm text-gray-700">{prop.nombre}</span>
+                          <span className="ml-3 text-sm text-gray-700">{prop.nombre_propiedad}</span>
                         </label>
                       ))}
                   </div>

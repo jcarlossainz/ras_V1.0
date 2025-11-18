@@ -55,7 +55,7 @@ export default function CalendarioPagosPage() {
       // Cargar información de la propiedad
       const { data: propData, error: propError } = await supabase
         .from('propiedades')
-        .select('id, nombre')
+        .select('id, nombre_propiedad')
         .eq('id', propiedadId)
         .single();
 
@@ -186,7 +186,7 @@ export default function CalendarioPagosPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema">
       <TopBar
-        title={`📅 ${propiedad?.nombre || 'Calendario de Pagos'}`}
+        title={`📅 ${propiedad?.nombre_propiedad || 'Calendario de Pagos'}`}
         showBackButton
         onBackClick={() => router.push('/dashboard/catalogo')}
       />

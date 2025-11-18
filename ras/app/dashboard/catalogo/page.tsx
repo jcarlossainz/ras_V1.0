@@ -58,109 +58,94 @@ export default function CatalogoPage() {
     setLoading(false)
   }
 
-  // ⚡ OPTIMIZADO: Carga con JOINs - solo 3 queries máximo
+  // VERSIÓN COMPATIBLE: Usa SELECT * para evitar errores de columnas faltantes
   const cargarPropiedades = async (userId: string) => {
     try {
-      // Query 1: Propiedades propias con todos los datos en un solo JOIN
-      const { data: propiedadesPropias, error: errorPropias } = await supabase
+      // Cargar todas las propiedades del usuario
+      const { data: todasPropiedades, error } = await supabase
         .from('propiedades')
-        .select(`
-          id,
-          owner_id,
-          nombre_propiedad,
-          codigo_postal,
-          created_at,
-          propiedades_colaboradores (
-            user_id,
-            profiles:user_id (
-              nombre,
-              email
-            )
-          ),
-          property_images!inner (
-            url_thumbnail
-          )
-        `)
+        .select('*')
         .eq('owner_id', userId)
-        .eq('property_images.is_cover', true)
         .order('created_at', { ascending: false })
-        .limit(100) // Paginación: primeras 100
 
-      if (errorPropias) {
-        logger.error('Error cargando propiedades propias:', errorPropias)
+      if (error) {
+        logger.error('Error cargando propiedades:', error)
+        toast.error('Error al cargar propiedades')
+        setPropiedades([])
+        return
       }
 
-      // Query 2: IDs de propiedades compartidas
+      // Cargar colaboradores e imágenes para cada propiedad
+      const propiedadesConDatos = await Promise.all(
+        (todasPropiedades || []).map(async (prop) => {
+          // Cargar colaboradores
+          const { data: colaboradores } = await supabase
+            .from('propiedades_colaboradores')
+            .select('user_id')
+            .eq('propiedad_id', prop.id)
+
+          // Cargar foto de portada
+          const { data: fotos } = await supabase
+            .from('property_images')
+            .select('url_thumbnail')
+            .eq('property_id', prop.id)
+            .eq('is_cover', true)
+            .limit(1)
+
+          return {
+            id: prop.id,
+            owner_id: prop.owner_id,
+            nombre: prop.nombre_propiedad || 'Sin nombre',
+            codigo_postal: prop.ubicacion?.codigo_postal || 'N/A',
+            created_at: prop.created_at,
+            es_propio: true,
+            foto_portada: fotos?.[0]?.url_thumbnail || null,
+            colaboradores: colaboradores || []
+          }
+        })
+      )
+
+      // Cargar propiedades compartidas
       const { data: propiedadesCompartidas } = await supabase
         .from('propiedades_colaboradores')
         .select('propiedad_id')
         .eq('user_id', userId)
 
-      let propiedadesCompartidasData: any[] = []
-
-      // Query 3: Propiedades compartidas con JOINs (solo si hay compartidas)
       if (propiedadesCompartidas && propiedadesCompartidas.length > 0) {
         const idsCompartidos = propiedadesCompartidas.map(p => p.propiedad_id)
-        const { data: datosCompartidos } = await supabase
+        const { data: props } = await supabase
           .from('propiedades')
-          .select(`
-            id,
-            owner_id,
-            nombre_propiedad,
-            codigo_postal,
-            created_at,
-            propiedades_colaboradores (
-              user_id,
-              profiles:user_id (
-                nombre,
-                email
-              )
-            ),
-            property_images (
-              url_thumbnail
-            )
-          `)
+          .select('*')
           .in('id', idsCompartidos)
-          .eq('property_images.is_cover', true)
-          .limit(100)
 
-        propiedadesCompartidasData = datosCompartidos || []
+        const propiedadesCompartidasData = await Promise.all(
+          (props || []).map(async (prop) => {
+            const { data: fotos } = await supabase
+              .from('property_images')
+              .select('url_thumbnail')
+              .eq('property_id', prop.id)
+              .eq('is_cover', true)
+              .limit(1)
+
+            return {
+              id: prop.id,
+              owner_id: prop.owner_id,
+              nombre: prop.nombre_propiedad || 'Sin nombre',
+              codigo_postal: prop.ubicacion?.codigo_postal || 'N/A',
+              created_at: prop.created_at,
+              es_propio: false,
+              foto_portada: fotos?.[0]?.url_thumbnail || null,
+              colaboradores: []
+            }
+          })
+        )
+
+        setPropiedades([...propiedadesConDatos, ...propiedadesCompartidasData])
+      } else {
+        setPropiedades(propiedadesConDatos)
       }
 
-      // Transformar datos (sin loops adicionales)
-      const todasPropiedades = [
-        ...(propiedadesPropias || []).map(p => ({
-          id: p.id,
-          owner_id: p.owner_id,
-          nombre: p.nombre_propiedad,
-          codigo_postal: p.codigo_postal,
-          created_at: p.created_at,
-          es_propio: true,
-          foto_portada: p.property_images?.[0]?.url_thumbnail || null,
-          colaboradores: (p.propiedades_colaboradores || []).map((c: any) => ({
-            user_id: c.user_id,
-            nombre: c.profiles?.nombre || 'Sin nombre',
-            email: c.profiles?.email || 'Sin email'
-          }))
-        })),
-        ...(propiedadesCompartidasData || []).map(p => ({
-          id: p.id,
-          owner_id: p.owner_id,
-          nombre: p.nombre_propiedad,
-          codigo_postal: p.codigo_postal,
-          created_at: p.created_at,
-          es_propio: false,
-          foto_portada: p.property_images?.[0]?.url_thumbnail || null,
-          colaboradores: (p.propiedades_colaboradores || []).map((c: any) => ({
-            user_id: c.user_id,
-            nombre: c.profiles?.nombre || 'Sin nombre',
-            email: c.profiles?.email || 'Sin email'
-          }))
-        }))
-      ]
-
-      setPropiedades(todasPropiedades)
-      logger.log(`✅ Cargadas ${todasPropiedades.length} propiedades en 3 queries`)
+      logger.log(`✅ Cargadas ${propiedadesConDatos.length} propiedades`)
 
     } catch (error: any) {
       logger.error('Error cargando propiedades:', error)

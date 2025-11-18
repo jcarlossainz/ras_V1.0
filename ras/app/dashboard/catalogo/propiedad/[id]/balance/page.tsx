@@ -84,7 +84,7 @@ export default function BalancePropiedadPage() {
       // Cargar propiedad
       const { data: propData, error: propError } = await supabase
         .from('propiedades')
-        .select('id, nombre, tipo_propiedad')
+        .select('id, nombre_propiedad, tipo_propiedad')
         .eq('id', propiedadId)
         .single()
 
@@ -117,7 +117,7 @@ export default function BalancePropiedadPage() {
       // Transformar pagos a movimientos (egresos)
       const movimientosEgresos: Movimiento[] = (pagos || []).map(pago => ({
         id: pago.id,
-        propiedad_nombre: propData.nombre,
+        propiedad_nombre: propData.nombre_propiedad,
         tipo: 'egreso' as const,
         titulo: pago.servicios_inmueble.nombre,
         monto: pago.monto_estimado,
@@ -260,7 +260,7 @@ export default function BalancePropiedadPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema">
       <TopBar
-        title={`Balance - ${propiedad?.nombre || 'Propiedad'}`}
+        title={`Balance - ${propiedad?.nombre_propiedad || 'Propiedad'}`}
         showBackButton
         onBackClick={volverPropiedad}
       />

@@ -83,7 +83,7 @@ export default function TicketsPropiedadPage() {
       // Cargar información de la propiedad
       const { data: propData, error: propError } = await supabase
         .from('propiedades')
-        .select('id, nombre')
+        .select('id, nombre_propiedad')
         .eq('id', propiedadId)
         .single()
 
@@ -122,7 +122,7 @@ export default function TicketsPropiedadPage() {
           responsable: ticket.responsable,
           proveedor: ticket.proveedor,
           propiedad_id: ticket.propiedad_id,
-          propiedad_nombre: propData.nombre,
+          propiedad_nombre: propData.nombre_propiedad,
           dias_restantes: diasRestantes
         }
       })
@@ -277,7 +277,7 @@ ${ticket.proveedor ? `🏢 Proveedor: ${ticket.proveedor}` : ''}
   return (
     <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema">
       <TopBar
-        title={`Tickets - ${propiedad?.nombre || 'Propiedad'}`}
+        title={`Tickets - ${propiedad?.nombre_propiedad || 'Propiedad'}`}
         showBackButton
         showAddButton
         onBackClick={volverPropiedad}

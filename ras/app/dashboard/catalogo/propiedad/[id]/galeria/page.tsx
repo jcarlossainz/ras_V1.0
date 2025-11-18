@@ -55,7 +55,7 @@ export default function GaleriaPage() {
       // Cargar propiedad desde tabla propiedades
       const { data: propertyData, error: propertyError } = await supabase
         .from('propiedades')
-        .select('id, nombre, tipo_propiedad, estados, espacios')
+        .select('id, nombre_propiedad, tipo_propiedad, estados, espacios')
         .eq('id', propertyId)
         .single()
 
@@ -96,7 +96,7 @@ export default function GaleriaPage() {
 
       const propertyComplete: Partial<PropertyFormData> = {
         id: propertyId,
-        nombre_propiedad: propertyData?.nombre || 'Mi Propiedad',
+        nombre_propiedad: propertyData?.nombre_propiedad || 'Mi Propiedad',
         tipo_propiedad: propertyData?.tipo_propiedad || 'Casa',
         estados: propertyData?.estados || ['Disponible'],
         photos: photosData,

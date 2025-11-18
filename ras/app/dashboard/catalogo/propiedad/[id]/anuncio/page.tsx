@@ -17,13 +17,15 @@ import Button from '@/components/ui/button'
 
 interface Propiedad {
   id: string
-  nombre: string
+  nombre_propiedad: string
   tipo_propiedad: string
   descripcion_anuncio: string | null
   estado_anuncio: 'borrador' | 'publicado' | 'pausado' | null
-  precio_venta: number | null
-  costo_renta_mensual: number | null
-  precio_noche: number | null
+  precios?: {
+    venta?: number | null
+    mensual?: number | null
+    noche?: number | null
+  } | null
   foto_portada?: string | null
 }
 
@@ -66,7 +68,7 @@ export default function AnuncioEditPage() {
       // Cargar propiedad
       const { data: propData, error: propError } = await supabase
         .from('propiedades')
-        .select('id, nombre, tipo_propiedad, descripcion_anuncio, estado_anuncio, precio_venta, costo_renta_mensual, precio_noche')
+        .select('id, nombre_propiedad, tipo_propiedad, descripcion_anuncio, estado_anuncio, precios')
         .eq('id', propiedadId)
         .single()
 
@@ -160,7 +162,7 @@ export default function AnuncioEditPage() {
         if (!continuar) return
       }
 
-      if (!propiedad.precio_venta && !propiedad.costo_renta_mensual && !propiedad.precio_noche) {
+      if (!propiedad.precios?.venta && !propiedad.precios?.mensual && !propiedad.precios?.noche) {
         toast.error('Configura al menos un precio antes de publicar')
         return
       }
@@ -239,7 +241,7 @@ export default function AnuncioEditPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema">
       <TopBar
-        title={`Anuncio - ${propiedad.nombre}`}
+        title={`Anuncio - ${propiedad.nombre_propiedad}`}
         showBackButton
         onBackClick={volverPropiedad}
       />
@@ -320,24 +322,24 @@ export default function AnuncioEditPage() {
           <h3 className="text-lg font-bold text-gray-900 mb-4 font-poppins">Precios configurados</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className={`p-4 rounded-lg border-2 ${propiedad.precio_venta ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
+            <div className={`p-4 rounded-lg border-2 ${propiedad.precios?.venta ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
               <div className="text-xs text-gray-600 mb-1">Precio de venta</div>
-              <div className={`text-2xl font-bold ${propiedad.precio_venta ? 'text-blue-600' : 'text-gray-400'}`}>
-                {propiedad.precio_venta ? `$${propiedad.precio_venta.toLocaleString('es-MX')}` : 'No configurado'}
+              <div className={`text-2xl font-bold ${propiedad.precios?.venta ? 'text-blue-600' : 'text-gray-400'}`}>
+                {propiedad.precios?.venta ? `$${propiedad.precios.venta.toLocaleString('es-MX')}` : 'No configurado'}
               </div>
             </div>
 
-            <div className={`p-4 rounded-lg border-2 ${propiedad.costo_renta_mensual ? 'border-purple-300 bg-purple-50' : 'border-gray-200 bg-gray-50'}`}>
+            <div className={`p-4 rounded-lg border-2 ${propiedad.precios?.mensual ? 'border-purple-300 bg-purple-50' : 'border-gray-200 bg-gray-50'}`}>
               <div className="text-xs text-gray-600 mb-1">Renta mensual</div>
-              <div className={`text-2xl font-bold ${propiedad.costo_renta_mensual ? 'text-purple-600' : 'text-gray-400'}`}>
-                {propiedad.costo_renta_mensual ? `$${propiedad.costo_renta_mensual.toLocaleString('es-MX')}` : 'No configurado'}
+              <div className={`text-2xl font-bold ${propiedad.precios?.mensual ? 'text-purple-600' : 'text-gray-400'}`}>
+                {propiedad.precios?.mensual ? `$${propiedad.precios.mensual.toLocaleString('es-MX')}` : 'No configurado'}
               </div>
             </div>
 
-            <div className={`p-4 rounded-lg border-2 ${propiedad.precio_noche ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+            <div className={`p-4 rounded-lg border-2 ${propiedad.precios?.noche ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
               <div className="text-xs text-gray-600 mb-1">Precio por noche</div>
-              <div className={`text-2xl font-bold ${propiedad.precio_noche ? 'text-green-600' : 'text-gray-400'}`}>
-                {propiedad.precio_noche ? `USD ${propiedad.precio_noche.toFixed(2)}` : 'No configurado'}
+              <div className={`text-2xl font-bold ${propiedad.precios?.noche ? 'text-green-600' : 'text-gray-400'}`}>
+                {propiedad.precios?.noche ? `USD ${propiedad.precios.noche.toFixed(2)}` : 'No configurado'}
               </div>
             </div>
           </div>

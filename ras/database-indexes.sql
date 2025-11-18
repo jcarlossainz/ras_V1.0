@@ -90,10 +90,11 @@ END $$;
 DO $$
 BEGIN
     IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'tickets') THEN
-        CREATE INDEX IF NOT EXISTS idx_tickets_property_id ON tickets(property_id);
-        CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
-        CREATE INDEX IF NOT EXISTS idx_tickets_fecha ON tickets(fecha_vencimiento);
-        CREATE INDEX IF NOT EXISTS idx_tickets_property_status ON tickets(property_id, status);
+        CREATE INDEX IF NOT EXISTS idx_tickets_propiedad_id ON tickets(propiedad_id);
+        CREATE INDEX IF NOT EXISTS idx_tickets_estado ON tickets(estado);
+        CREATE INDEX IF NOT EXISTS idx_tickets_pagado ON tickets(pagado) WHERE pagado = false;
+        CREATE INDEX IF NOT EXISTS idx_tickets_fecha ON tickets(fecha_programada);
+        CREATE INDEX IF NOT EXISTS idx_tickets_propiedad_estado ON tickets(propiedad_id, estado);
         RAISE NOTICE 'Índices para tickets creados exitosamente';
     ELSE
         RAISE NOTICE 'Tabla tickets no existe - índices omitidos';

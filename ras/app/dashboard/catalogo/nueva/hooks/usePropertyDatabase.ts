@@ -89,7 +89,8 @@ function transformFormToDatabase(formData: PropertyFormData): any {
     frecuencia_pago: formData.frecuencia_pago || null,
     dia_pago: formData.dia_pago ? parseInt(formData.dia_pago) : null,
 
-    precio_renta_disponible: formData.precio_renta_disponible ? parseFloat(formData.precio_renta_disponible) : null,
+    // NOTA: precio_renta_disponible se eliminó - ahora usa precios.mensual (JSONB)
+    // precio_renta_disponible: formData.precio_renta_disponible ? parseFloat(formData.precio_renta_disponible) : null,
     requisitos_renta: formData.requisitos_renta || [],
     requisitos_renta_custom: formData.requisitos_renta_custom || [],
     

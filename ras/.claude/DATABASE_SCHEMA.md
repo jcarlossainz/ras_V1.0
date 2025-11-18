@@ -153,7 +153,7 @@ CREATE TABLE propiedades (
   frecuencia_pago       TEXT, -- 'mensual' | 'quincenal' | 'semanal'
   dia_pago              INTEGER,
 
-  precio_renta_disponible NUMERIC(10,2),
+  -- ❌ ELIMINADO: precio_renta_disponible - Ahora se usa precios.mensual (JSONB)
   requisitos_renta      TEXT[],
   requisitos_renta_custom TEXT[],
 

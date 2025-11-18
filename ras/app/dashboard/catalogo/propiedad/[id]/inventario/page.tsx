@@ -15,28 +15,26 @@ import { logger } from '@/lib/logger'
 import TopBar from '@/components/ui/topbar'
 import Loading from '@/components/ui/loading'
 import EmptyState from '@/components/ui/emptystate'
-import EditItemModal from './components/EditItemmodal'
 
 interface InventoryItem {
   id: string
-  object_name: string
-  confidence: number
+  object_name: string | null
   space_type: string | null
   labels: string | null
-  image_url: string
-  image_id: string
-  created_at: string
+  url: string
+  uploaded_at: string
 }
 
 interface PropertyData {
   id: string
   nombre_propiedad: string
   tipo_propiedad: string
+  espacios: any[]
 }
 
-interface SpaceData {
+interface SpaceOption {
   id: string
-  nombre: string
+  name: string
 }
 
 export default function InventarioPage() {
@@ -48,16 +46,12 @@ export default function InventarioPage() {
   const { user, loading: authLoading, isAuthenticated } = useAuth()
 
   const [property, setProperty] = useState<PropertyData | null>(null)
-  const [spaces, setSpaces] = useState<SpaceData[]>([])
+  const [spaces, setSpaces] = useState<SpaceOption[]>([])
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [analyzing, setAnalyzing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterSpace, setFilterSpace] = useState<string>('all')
-
-  // Estados para el modal de edición
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -69,10 +63,10 @@ export default function InventarioPage() {
     try {
       setLoading(true)
 
-      // Cargar propiedad
+      // Cargar propiedad con sus espacios
       const { data: propertyData, error: propError } = await supabase
         .from('propiedades')
-        .select('id, nombre_propiedad, tipo_propiedad')
+        .select('id, nombre_propiedad, tipo_propiedad, espacios')
         .eq('id', propertyId)
         .single()
 
@@ -85,16 +79,16 @@ export default function InventarioPage() {
 
       setProperty(propertyData)
 
-      // Cargar espacios de la propiedad
-      const { data: spacesData } = await supabase
-        .from('property_spaces')
-        .select('id, nombre')
-        .eq('property_id', propertyId)
-        .order('nombre')
+      // Extraer espacios del JSONB
+      if (propertyData.espacios && Array.isArray(propertyData.espacios)) {
+        const espaciosOptions: SpaceOption[] = propertyData.espacios.map((espacio: any) => ({
+          id: espacio.id || espacio.type,
+          name: espacio.name || espacio.type
+        }))
+        setSpaces(espaciosOptions)
+      }
 
-      setSpaces(spacesData || [])
-
-      // Cargar inventario
+      // Cargar inventario (imágenes con detección de IA)
       await loadInventory()
 
     } catch (error: any) {
@@ -108,10 +102,11 @@ export default function InventarioPage() {
   const loadInventory = useCallback(async () => {
     try {
       const { data, error } = await supabase
-        .from('property_inventory')
-        .select('*')
+        .from('property_images')
+        .select('id, object_name, space_type, labels, url, uploaded_at')
         .eq('property_id', propertyId)
-        .order('created_at', { ascending: false })
+        .not('object_name', 'is', null) // Solo imágenes que ya fueron analizadas
+        .order('uploaded_at', { ascending: false })
 
       if (error) throw error
       setInventory(data || [])
@@ -148,63 +143,36 @@ export default function InventarioPage() {
 
     } catch (error: any) {
       logger.error('Error en análisis:', error)
-      toast.error('Error al analizar imágenes')
+      toast.error('Error al analizar las imágenes')
     } finally {
       setAnalyzing(false)
     }
   }, [propertyId, loadInventory, toast, confirm])
 
-  const handleEditItem = useCallback((item: InventoryItem) => {
-    setEditingItem(item)
-    setShowEditModal(true)
-  }, [])
-
-  const handleSaveEdit = useCallback(async (updatedItem: { object_name: string; labels: string; space_type: string }) => {
-    if (!editingItem) return
-
-    try {
-      const { error } = await supabase
-        .from('property_inventory')
-        .update({
-          object_name: updatedItem.object_name,
-          labels: updatedItem.labels || null,
-          space_type: updatedItem.space_type || null
-        })
-        .eq('id', editingItem.id)
-
-      if (error) throw error
-
-      await loadInventory()
-      setShowEditModal(false)
-      setEditingItem(null)
-      toast.success('Item actualizado correctamente')
-    } catch (error: any) {
-      logger.error('Error actualizando item:', error)
-      toast.error('Error al actualizar el item')
-    }
-  }, [editingItem, loadInventory, toast])
-
-  const handleDeleteItem = useCallback(async (itemId: string) => {
-    const confirmed = await confirm.danger(
-      '¿Eliminar este item del inventario?',
-      'Esta acción no se puede deshacer.'
+  const handleClearDetection = useCallback(async (imageId: string) => {
+    const confirmed = await confirm.warning(
+      '¿Limpiar detección de IA?',
+      'Esto eliminará la información detectada automáticamente. Podrás volver a analizar la imagen más tarde.'
     )
 
     if (!confirmed) return
 
     try {
       const { error } = await supabase
-        .from('property_inventory')
-        .delete()
-        .eq('id', itemId)
+        .from('property_images')
+        .update({
+          object_name: null,
+          labels: null
+        })
+        .eq('id', imageId)
 
       if (error) throw error
 
-      setInventory(inventory.filter(item => item.id !== itemId))
-      toast.success('Item eliminado correctamente')
+      setInventory(inventory.filter(item => item.id !== imageId))
+      toast.success('Detección eliminada correctamente')
     } catch (error: any) {
-      logger.error('Error eliminando item:', error)
-      toast.error('Error al eliminar el item')
+      logger.error('Error eliminando detección:', error)
+      toast.error('Error al eliminar la detección')
     }
   }, [inventory, toast, confirm])
 
@@ -222,14 +190,14 @@ export default function InventarioPage() {
     if (!spaceId) return 'Sin espacio'
 
     const space = spaces.find(s => s.id === spaceId)
-    return space ? space.nombre : 'Espacio desconocido'
+    return space ? space.name : spaceId
   }, [spaces])
 
   // Filtrar inventario
   const filteredInventory = inventory.filter((item) => {
     // Filtro de búsqueda
     const matchesSearch =
-      item.object_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.object_name && item.object_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (item.labels && item.labels.toLowerCase().includes(searchQuery.toLowerCase()))
 
     // Filtro por espacio
@@ -254,7 +222,7 @@ export default function InventarioPage() {
 
   if (!property) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <EmptyState
           icon={
             <svg className="w-12 h-12 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -271,7 +239,7 @@ export default function InventarioPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema">
+    <div className="min-h-screen bg-gray-50">
       <TopBar
         title={`Inventario - ${property.nombre_propiedad}`}
         showBackButton
@@ -281,16 +249,16 @@ export default function InventarioPage() {
         onLogout={handleLogout}
       />
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Barra de acción superior */}
-        {inventory.length > 0 && (
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              {/* Botón Analizar */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            {/* Botón Analizar */}
+            <div>
               <button
                 onClick={handleAnalyzeAll}
                 disabled={analyzing}
-                className="px-6 py-3 bg-gradient-to-r from-ras-azul to-ras-turquesa text-white rounded-xl hover:shadow-lg transition-all disabled:bg-gray-400 font-semibold font-poppins"
+                className="px-6 py-3 bg-gradient-to-r from-ras-azul to-ras-turquesa text-white rounded-xl hover:shadow-lg transition-all disabled:bg-gray-400 font-semibold"
               >
                 {analyzing ? (
                   <span className="flex items-center gap-2">
@@ -304,168 +272,124 @@ export default function InventarioPage() {
                   '🔍 Analizar Galería con IA'
                 )}
               </button>
+              <p className="text-sm text-gray-500 mt-2">Detecta objetos automáticamente en todas las fotos</p>
+            </div>
 
-              {/* Total de Items */}
-              <div className="text-right">
-                <h3 className="text-sm font-semibold text-gray-600 mb-1 font-poppins">Total de Items</h3>
-                <p className="text-4xl font-bold text-ras-azul font-poppins">{inventory.length}</p>
+            {/* Total de Items */}
+            <div className="text-right">
+              <h3 className="text-sm font-semibold text-gray-600 mb-1">Total de Items</h3>
+              <p className="text-4xl font-bold text-ras-azul">{inventory.length}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Barra de búsqueda y filtros */}
+        {inventory.length > 0 && (
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 mb-6">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
+              {/* Buscador */}
+              <div className="flex-1">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Buscar por objeto o etiquetas..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-lg focus:border-ras-turquesa focus:outline-none transition-colors"
+                  />
+                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35"/>
+                  </svg>
+                </div>
+              </div>
+
+              {/* Filtro por espacio */}
+              <div className="relative">
+                <select
+                  value={filterSpace}
+                  onChange={(e) => setFilterSpace(e.target.value)}
+                  className="appearance-none bg-white border-2 border-gray-200 rounded-lg px-4 py-2 pr-10 font-medium text-gray-700 hover:border-ras-turquesa focus:border-ras-turquesa focus:outline-none transition-colors cursor-pointer min-w-[200px]"
+                >
+                  <option value="all">📍 Todos los espacios</option>
+                  <option value="sin-espacio">🔹 Sin espacio</option>
+                  {uniqueSpaces.map(spaceId => (
+                    <option key={spaceId} value={spaceId}>
+                      {getSpaceName(spaceId)}
+                    </option>
+                  ))}
+                </select>
+                <svg className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
               </div>
             </div>
           </div>
         )}
 
-        {/* Barra de búsqueda y filtros */}
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 mb-6">
-          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
-            {/* Buscador */}
-            <div className="flex-1">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Buscar por objeto o etiquetas..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:border-ras-turquesa focus:outline-none focus:ring-2 focus:ring-ras-turquesa transition-colors"
-                />
-                <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8"/>
-                  <path d="m21 21-4.35-4.35"/>
-                </svg>
-              </div>
-            </div>
-
-            {/* Filtro por espacio */}
-            <div className="relative">
-              <select
-                value={filterSpace}
-                onChange={(e) => setFilterSpace(e.target.value)}
-                className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-10 font-medium text-gray-700 hover:border-ras-turquesa focus:border-ras-turquesa focus:outline-none focus:ring-2 focus:ring-ras-turquesa transition-colors cursor-pointer min-w-[200px]"
-              >
-                <option value="all">📍 Todos los espacios</option>
-                <option value="sin-espacio">🔹 Sin espacio</option>
-                {uniqueSpaces.map(spaceId => (
-                  <option key={spaceId} value={spaceId}>
-                    {getSpaceName(spaceId)}
-                  </option>
-                ))}
-              </select>
-              <svg className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="6 9 12 15 18 9"/>
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabla de inventario */}
+        {/* Grid de inventario */}
         {filteredInventory.length > 0 ? (
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-            {/* Encabezados */}
-            <div className="bg-gradient-to-r from-ras-azul to-ras-turquesa text-white px-6 py-3">
-              <div className="grid grid-cols-12 gap-4 items-center text-xs font-semibold uppercase font-poppins">
-                <div className="col-span-1">Imagen</div>
-                <div className="col-span-3">Objeto</div>
-                <div className="col-span-3">Etiquetas</div>
-                <div className="col-span-3">Espacio</div>
-                <div className="col-span-2 text-center">Acciones</div>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredInventory.map((item) => (
+              <div
+                key={item.id}
+                className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:shadow-xl transition-all"
+              >
+                {/* Imagen */}
+                <div className="relative aspect-square">
+                  <img
+                    src={item.url}
+                    alt={item.object_name || 'Item'}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = "https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=Error"
+                    }}
+                  />
 
-            {/* Filas */}
-            <div className="divide-y divide-gray-100">
-              {filteredInventory.map((item) => (
-                <div key={item.id} className="px-6 py-4 hover:bg-ras-turquesa/5 transition-colors">
-                  <div className="grid grid-cols-12 gap-4 items-center">
-                    {/* Imagen */}
-                    <div className="col-span-1">
-                      <img
-                        src={item.image_url}
-                        alt={item.object_name}
-                        className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200 shadow-sm"
-                        onError={(e) => {
-                          e.currentTarget.src = "https://via.placeholder.com/64x64/f3f4f6/9ca3af?text=?"
-                        }}
-                      />
+                  {/* Badge de espacio */}
+                  {item.space_type && (
+                    <div className="absolute top-3 left-3 px-3 py-1 bg-blue-500 text-white text-xs font-bold rounded-lg shadow-lg">
+                      {getSpaceName(item.space_type)}
                     </div>
+                  )}
+                </div>
 
-                    {/* Objeto */}
-                    <div className="col-span-3">
-                      <div className="text-sm font-semibold text-gray-900 font-poppins">
-                        {item.object_name}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        Confianza: {(item.confidence * 100).toFixed(0)}%
-                      </div>
-                    </div>
+                {/* Contenido */}
+                <div className="p-4">
+                  {/* Nombre del objeto */}
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">
+                    {item.object_name || 'Objeto detectado'}
+                  </h3>
 
-                    {/* Etiquetas */}
-                    <div className="col-span-3">
-                      {item.labels ? (
-                        <div className="flex flex-wrap gap-1">
-                          {item.labels.split(',').slice(0, 3).map((label, idx) => (
-                            <span
-                              key={idx}
-                              className="px-2 py-1 text-xs rounded-lg bg-purple-100 text-purple-700 font-medium border border-purple-200"
-                            >
-                              {label.trim()}
-                            </span>
-                          ))}
-                          {item.labels.split(',').length > 3 && (
-                            <span className="px-2 py-1 text-xs rounded-lg bg-gray-100 text-gray-600 border border-gray-200">
-                              +{item.labels.split(',').length - 3}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400 italic">Sin etiquetas</span>
+                  {/* Etiquetas */}
+                  {item.labels && (
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {item.labels.split(',').slice(0, 4).map((label, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-1 text-xs rounded-lg bg-purple-100 text-purple-700 font-medium border border-purple-200"
+                        >
+                          {label.trim()}
+                        </span>
+                      ))}
+                      {item.labels.split(',').length > 4 && (
+                        <span className="px-2 py-1 text-xs rounded-lg bg-gray-100 text-gray-600 border border-gray-200">
+                          +{item.labels.split(',').length - 4}
+                        </span>
                       )}
                     </div>
+                  )}
 
-                    {/* Espacio */}
-                    <div className="col-span-3">
-                      <span className="px-3 py-1 text-sm rounded-lg bg-blue-100 text-blue-700 font-medium border border-blue-200">
-                        {getSpaceName(item.space_type)}
-                      </span>
-                    </div>
-
-                    {/* Acciones */}
-                    <div className="col-span-2">
-                      <div className="flex gap-2 justify-center">
-                        {/* Editar */}
-                        <button
-                          onClick={() => handleEditItem(item)}
-                          className="w-10 h-10 rounded-lg border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 hover:scale-110 transition-all flex items-center justify-center group"
-                          title="Editar"
-                        >
-                          <svg className="w-5 h-5 text-blue-600 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                          </svg>
-                        </button>
-
-                        {/* Eliminar */}
-                        <button
-                          onClick={() => handleDeleteItem(item.id)}
-                          className="w-10 h-10 rounded-lg border-2 border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-400 hover:scale-110 transition-all flex items-center justify-center group"
-                          title="Eliminar"
-                        >
-                          <svg className="w-5 h-5 text-red-600 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <line x1="18" y1="6" x2="6" y2="18"/>
-                            <line x1="6" y1="6" x2="18" y2="18"/>
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Botón eliminar detección */}
+                  <button
+                    onClick={() => handleClearDetection(item.id)}
+                    className="w-full px-4 py-2 border-2 border-red-200 text-red-600 rounded-lg hover:bg-red-50 hover:border-red-300 transition-all text-sm font-semibold"
+                  >
+                    Limpiar detección
+                  </button>
                 </div>
-              ))}
-            </div>
-
-            {/* Footer con total */}
-            <div className="bg-gray-50 border-t border-gray-200 px-6 py-3">
-              <div className="text-sm font-semibold text-gray-600 font-poppins">
-                Mostrando {filteredInventory.length} de {inventory.length} item{inventory.length !== 1 ? 's' : ''}
               </div>
-            </div>
+            ))}
           </div>
         ) : (
           <EmptyState
@@ -483,19 +407,6 @@ export default function InventarioPage() {
           />
         )}
       </main>
-
-      {/* Modal de edición */}
-      {showEditModal && editingItem && (
-        <EditItemModal
-          item={editingItem}
-          spaces={spaces}
-          onClose={() => {
-            setShowEditModal(false)
-            setEditingItem(null)
-          }}
-          onSave={handleSaveEdit}
-        />
-      )}
     </div>
   )
 }

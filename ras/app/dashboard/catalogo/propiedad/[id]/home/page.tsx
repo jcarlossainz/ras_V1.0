@@ -85,7 +85,6 @@ interface PropiedadData {
   servicios?: Array<{
     id?: string
     nombre: string
-    tipo_servicio?: string
     proveedor?: string
     costo?: number
     frecuencia?: string
@@ -762,17 +761,15 @@ export default function HomePropiedad() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {propiedad.servicios.map((servicio, idx) => (
                   <div key={idx} className="p-4 bg-teal-50 rounded-lg border border-teal-200">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <span className="text-xs text-teal-600 font-semibold uppercase block mb-1">
-                          {servicio.tipo_servicio || 'Servicio'}
-                        </span>
-                        <p className="text-sm font-bold text-gray-900">{servicio.nombre}</p>
-                        {servicio.proveedor && (
-                          <p className="text-xs text-gray-600 mt-1">Proveedor: {servicio.proveedor}</p>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <svg className="w-4 h-4 text-teal-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <p className="text-base font-bold text-gray-900">{servicio.nombre}</p>
                     </div>
+                    {servicio.proveedor && (
+                      <p className="text-sm text-gray-600 ml-6">📍 {servicio.proveedor}</p>
+                    )}
                   </div>
                 ))}
               </div>

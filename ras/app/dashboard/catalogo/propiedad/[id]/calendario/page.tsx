@@ -45,7 +45,7 @@ export default function CalendarioPropiedadPage() {
   const router = useRouter()
   const params = useParams()
   const toast = useToast()
-  const { user, loading: authLoading, isAuthenticated } = useAuth()
+  const { user, loading: authLoading } = useAuth()
 
   const propiedadId = params?.id as string
 
@@ -61,13 +61,13 @@ export default function CalendarioPropiedadPage() {
 
   useEffect(() => {
     if (!authLoading) {
-      if (!isAuthenticated) {
+      if (!user) {
         router.push('/login')
       } else {
         cargarDatos()
       }
     }
-  }, [authLoading, isAuthenticated])
+  }, [authLoading, user, cargarDatos])
 
   useEffect(() => {
     if (pagos.length >= 0) {
@@ -84,7 +84,7 @@ export default function CalendarioPropiedadPage() {
       // Cargar propiedad
       const { data: propData, error: propError } = await supabase
         .from('propiedades')
-        .select('id, nombre_propiedad, tipo_propiedad')
+        .select('id, nombre, tipo_propiedad')
         .eq('id', propiedadId)
         .single()
 
@@ -133,7 +133,7 @@ export default function CalendarioPropiedadPage() {
         servicio_nombre: pago.servicios_inmueble.nombre,
         tipo_servicio: pago.servicios_inmueble.tipo_servicio,
         propiedad_id: pago.propiedad_id,
-        propiedad_nombre: propData.nombre_propiedad
+        propiedad_nombre: propData.nombre
       }))
 
       setPagos(pagosTransformados)
@@ -273,7 +273,7 @@ export default function CalendarioPropiedadPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema">
       <TopBar
-        title={`Calendario - ${propiedad?.nombre_propiedad || 'Propiedad'}`}
+        title={`Calendario - ${propiedad?.nombre || 'Propiedad'}`}
         showBackButton
         onBackClick={volverCatalogo}
         showUserInfo={true}

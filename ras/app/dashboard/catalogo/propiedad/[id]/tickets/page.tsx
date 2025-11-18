@@ -45,7 +45,7 @@ export default function TicketsPropiedadPage() {
   const router = useRouter()
   const params = useParams()
   const toast = useToast()
-  const { user, loading: authLoading, isAuthenticated } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const propiedadId = params?.id as string
 
   const [tickets, setTickets] = useState<Ticket[]>([])
@@ -83,7 +83,7 @@ export default function TicketsPropiedadPage() {
       // Cargar información de la propiedad
       const { data: propData, error: propError } = await supabase
         .from('propiedades')
-        .select('id, nombre_propiedad')
+        .select('id, nombre')
         .eq('id', propiedadId)
         .single()
 
@@ -122,7 +122,7 @@ export default function TicketsPropiedadPage() {
           responsable: ticket.responsable,
           proveedor: ticket.proveedor,
           propiedad_id: ticket.propiedad_id,
-          propiedad_nombre: propData.nombre_propiedad,
+          propiedad_nombre: propData.nombre,
           dias_restantes: diasRestantes
         }
       })
@@ -162,10 +162,10 @@ export default function TicketsPropiedadPage() {
 
   // Cargar datos cuando el usuario está autenticado
   useEffect(() => {
-    if (isAuthenticated && user && propiedadId) {
+    if (!authLoading && user && propiedadId) {
       cargarDatos()
     }
-  }, [isAuthenticated, user, propiedadId, cargarDatos])
+  }, [authLoading, user, propiedadId, cargarDatos])
 
   useEffect(() => {
     if (tickets.length > 0) {
@@ -282,7 +282,7 @@ ${ticket.proveedor ? `🏢 Proveedor: ${ticket.proveedor}` : ''}
   return (
     <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema">
       <TopBar
-        title={`Tickets - ${propiedad?.nombre_propiedad || 'Propiedad'}`}
+        title={`Tickets - ${propiedad?.nombre || 'Propiedad'}`}
         showBackButton
         showAddButton
         onBackClick={volverCatalogo}

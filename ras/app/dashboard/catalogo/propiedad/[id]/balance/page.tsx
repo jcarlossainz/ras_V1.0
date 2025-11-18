@@ -36,7 +36,7 @@ export default function BalancePropiedadPage() {
   const router = useRouter()
   const params = useParams()
   const toast = useToast()
-  const { user, loading: authLoading, isAuthenticated } = useAuth()
+  const { user, loading: authLoading } = useAuth()
 
   const propiedadId = params?.id as string
 
@@ -84,7 +84,7 @@ export default function BalancePropiedadPage() {
       // Cargar propiedad
       const { data: propData, error: propError } = await supabase
         .from('propiedades')
-        .select('id, nombre_propiedad, tipo_propiedad')
+        .select('id, nombre, tipo_propiedad')
         .eq('id', propiedadId)
         .single()
 
@@ -117,7 +117,7 @@ export default function BalancePropiedadPage() {
       // Transformar pagos a movimientos (egresos)
       const movimientosEgresos: Movimiento[] = (pagos || []).map(pago => ({
         id: pago.id,
-        propiedad_nombre: propData.nombre_propiedad,
+        propiedad_nombre: propData.nombre,
         tipo: 'egreso' as const,
         titulo: pago.servicios_inmueble.nombre,
         monto: pago.monto_estimado,
@@ -179,11 +179,11 @@ export default function BalancePropiedadPage() {
   }, [movimientos, tipoFiltroTabla, busqueda, ordenFecha, fechaDesdeTabla, fechaHastaTabla])
 
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (!authLoading && user) {
       cargarDatos()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, user, propiedadId])
+  }, [authLoading, user, propiedadId])
 
   useEffect(() => {
     if (movimientos.length >= 0) {
@@ -267,7 +267,7 @@ export default function BalancePropiedadPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema">
       <TopBar
-        title={`Balance - ${propiedad?.nombre_propiedad || 'Propiedad'}`}
+        title={`Balance - ${propiedad?.nombre || 'Propiedad'}`}
         showBackButton
         onBackClick={volverCatalogo}
         showUserInfo={true}

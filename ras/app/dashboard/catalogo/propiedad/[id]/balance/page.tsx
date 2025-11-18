@@ -182,13 +182,15 @@ export default function BalancePropiedadPage() {
     if (isAuthenticated && user) {
       cargarDatos()
     }
-  }, [isAuthenticated, user, cargarDatos])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user, propiedadId])
 
   useEffect(() => {
     if (movimientos.length >= 0) {
       aplicarFiltros()
     }
-  }, [movimientos, aplicarFiltros])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movimientos, tipoFiltroTabla, busqueda, ordenFecha, fechaDesdeTabla, fechaHastaTabla])
 
   const limpiarFiltros = useCallback(() => {
     setTipoFiltroTabla('todos')

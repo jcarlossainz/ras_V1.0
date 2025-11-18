@@ -68,106 +68,159 @@ ON property_images(property_id, order_index);
 -- ================================================================
 -- 4. ÍNDICES PARA TABLA: property_inventory
 -- ================================================================
+-- NOTA: Solo crear si la tabla existe
 
--- Índice para buscar inventario por propiedad
-CREATE INDEX IF NOT EXISTS idx_inventory_property_id
-ON property_inventory(property_id);
-
--- Índice para buscar por espacio
-CREATE INDEX IF NOT EXISTS idx_inventory_space_type
-ON property_inventory(space_type);
-
--- Índice compuesto para filtros frecuentes
-CREATE INDEX IF NOT EXISTS idx_inventory_property_space
-ON property_inventory(property_id, space_type);
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'property_inventory') THEN
+        CREATE INDEX IF NOT EXISTS idx_inventory_property_id ON property_inventory(property_id);
+        CREATE INDEX IF NOT EXISTS idx_inventory_space_type ON property_inventory(space_type);
+        CREATE INDEX IF NOT EXISTS idx_inventory_property_space ON property_inventory(property_id, space_type);
+        RAISE NOTICE 'Índices para property_inventory creados exitosamente';
+    ELSE
+        RAISE NOTICE 'Tabla property_inventory no existe - índices omitidos';
+    END IF;
+END $$;
 
 -- ================================================================
--- 5. ÍNDICES PARA TABLA: tickets (si existe)
+-- 5. ÍNDICES PARA TABLA: tickets
 -- ================================================================
+-- NOTA: Solo crear si la tabla existe
 
--- Nota: Crear si la tabla existe
-CREATE INDEX IF NOT EXISTS idx_tickets_property_id
-ON tickets(property_id);
-
-CREATE INDEX IF NOT EXISTS idx_tickets_status
-ON tickets(status);
-
-CREATE INDEX IF NOT EXISTS idx_tickets_fecha
-ON tickets(fecha_vencimiento);
-
-CREATE INDEX IF NOT EXISTS idx_tickets_property_status
-ON tickets(property_id, status);
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'tickets') THEN
+        CREATE INDEX IF NOT EXISTS idx_tickets_property_id ON tickets(property_id);
+        CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
+        CREATE INDEX IF NOT EXISTS idx_tickets_fecha ON tickets(fecha_vencimiento);
+        CREATE INDEX IF NOT EXISTS idx_tickets_property_status ON tickets(property_id, status);
+        RAISE NOTICE 'Índices para tickets creados exitosamente';
+    ELSE
+        RAISE NOTICE 'Tabla tickets no existe - índices omitidos';
+    END IF;
+END $$;
 
 -- ================================================================
 -- 6. ÍNDICES PARA TABLA: fechas_pago_servicios
 -- ================================================================
+-- NOTA: Solo crear si la tabla existe
 
-CREATE INDEX IF NOT EXISTS idx_pagos_propiedad_id
-ON fechas_pago_servicios(propiedad_id);
-
-CREATE INDEX IF NOT EXISTS idx_pagos_fecha
-ON fechas_pago_servicios(fecha_pago);
-
-CREATE INDEX IF NOT EXISTS idx_pagos_pagado
-ON fechas_pago_servicios(pagado)
-WHERE pagado = false;
-
--- Índice compuesto para dashboard (pagos pendientes por propiedad)
-CREATE INDEX IF NOT EXISTS idx_pagos_propiedad_pendientes
-ON fechas_pago_servicios(propiedad_id, pagado, fecha_pago)
-WHERE pagado = false;
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'fechas_pago_servicios') THEN
+        CREATE INDEX IF NOT EXISTS idx_pagos_propiedad_id ON fechas_pago_servicios(propiedad_id);
+        CREATE INDEX IF NOT EXISTS idx_pagos_fecha ON fechas_pago_servicios(fecha_pago);
+        CREATE INDEX IF NOT EXISTS idx_pagos_pagado ON fechas_pago_servicios(pagado) WHERE pagado = false;
+        CREATE INDEX IF NOT EXISTS idx_pagos_propiedad_pendientes ON fechas_pago_servicios(propiedad_id, pagado, fecha_pago) WHERE pagado = false;
+        RAISE NOTICE 'Índices para fechas_pago_servicios creados exitosamente';
+    ELSE
+        RAISE NOTICE 'Tabla fechas_pago_servicios no existe - índices omitidos';
+    END IF;
+END $$;
 
 -- ================================================================
 -- 7. ÍNDICES PARA TABLA: servicios_inmueble
 -- ================================================================
+-- NOTA: Solo crear si la tabla existe
 
-CREATE INDEX IF NOT EXISTS idx_servicios_propiedad_id
-ON servicios_inmueble(propiedad_id);
-
-CREATE INDEX IF NOT EXISTS idx_servicios_activo
-ON servicios_inmueble(activo)
-WHERE activo = true;
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'servicios_inmueble') THEN
+        CREATE INDEX IF NOT EXISTS idx_servicios_propiedad_id ON servicios_inmueble(propiedad_id);
+        CREATE INDEX IF NOT EXISTS idx_servicios_activo ON servicios_inmueble(activo) WHERE activo = true;
+        RAISE NOTICE 'Índices para servicios_inmueble creados exitosamente';
+    ELSE
+        RAISE NOTICE 'Tabla servicios_inmueble no existe - índices omitidos';
+    END IF;
+END $$;
 
 -- ================================================================
 -- 8. ÍNDICES PARA TABLA: contactos
 -- ================================================================
+-- NOTA: Solo crear si la tabla existe
 
-CREATE INDEX IF NOT EXISTS idx_contactos_user_id
-ON contactos(user_id);
-
-CREATE INDEX IF NOT EXISTS idx_contactos_tipo
-ON contactos(tipo);
-
--- Índice para búsqueda por nombre
-CREATE INDEX IF NOT EXISTS idx_contactos_nombre
-ON contactos(LOWER(full_name) text_pattern_ops);
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'contactos') THEN
+        CREATE INDEX IF NOT EXISTS idx_contactos_user_id ON contactos(user_id);
+        CREATE INDEX IF NOT EXISTS idx_contactos_tipo ON contactos(tipo);
+        CREATE INDEX IF NOT EXISTS idx_contactos_nombre ON contactos(LOWER(full_name) text_pattern_ops);
+        RAISE NOTICE 'Índices para contactos creados exitosamente';
+    ELSE
+        RAISE NOTICE 'Tabla contactos no existe - índices omitidos';
+    END IF;
+END $$;
 
 -- ================================================================
 -- 9. ÍNDICES PARA TABLA: profiles
 -- ================================================================
+-- NOTA: Solo crear si la tabla existe
 
--- Índice para búsqueda por email
-CREATE INDEX IF NOT EXISTS idx_profiles_email
-ON profiles(LOWER(email) text_pattern_ops);
-
--- Índice para empresa
-CREATE INDEX IF NOT EXISTS idx_profiles_empresa_id
-ON profiles(empresa_id)
-WHERE empresa_id IS NOT NULL;
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'profiles') THEN
+        CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(LOWER(email) text_pattern_ops);
+        CREATE INDEX IF NOT EXISTS idx_profiles_empresa_id ON profiles(empresa_id) WHERE empresa_id IS NOT NULL;
+        RAISE NOTICE 'Índices para profiles creados exitosamente';
+    ELSE
+        RAISE NOTICE 'Tabla profiles no existe - índices omitidos';
+    END IF;
+END $$;
 
 -- ================================================================
 -- 10. ESTADÍSTICAS Y ANÁLISIS
 -- ================================================================
+-- Actualizar estadísticas solo para tablas que existen
 
--- Actualizar estadísticas de la base de datos
-ANALYZE propiedades;
-ANALYZE propiedades_colaboradores;
-ANALYZE property_images;
-ANALYZE property_inventory;
-ANALYZE fechas_pago_servicios;
-ANALYZE servicios_inmueble;
-ANALYZE contactos;
-ANALYZE profiles;
+DO $$
+BEGIN
+    -- Tablas principales (estas SÍ deben existir)
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'propiedades') THEN
+        EXECUTE 'ANALYZE propiedades';
+        RAISE NOTICE 'ANALYZE ejecutado en propiedades';
+    END IF;
+
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'propiedades_colaboradores') THEN
+        EXECUTE 'ANALYZE propiedades_colaboradores';
+        RAISE NOTICE 'ANALYZE ejecutado en propiedades_colaboradores';
+    END IF;
+
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'property_images') THEN
+        EXECUTE 'ANALYZE property_images';
+        RAISE NOTICE 'ANALYZE ejecutado en property_images';
+    END IF;
+
+    -- Tablas opcionales
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'property_inventory') THEN
+        EXECUTE 'ANALYZE property_inventory';
+        RAISE NOTICE 'ANALYZE ejecutado en property_inventory';
+    END IF;
+
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'tickets') THEN
+        EXECUTE 'ANALYZE tickets';
+        RAISE NOTICE 'ANALYZE ejecutado en tickets';
+    END IF;
+
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'fechas_pago_servicios') THEN
+        EXECUTE 'ANALYZE fechas_pago_servicios';
+        RAISE NOTICE 'ANALYZE ejecutado en fechas_pago_servicios';
+    END IF;
+
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'servicios_inmueble') THEN
+        EXECUTE 'ANALYZE servicios_inmueble';
+        RAISE NOTICE 'ANALYZE ejecutado en servicios_inmueble';
+    END IF;
+
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'contactos') THEN
+        EXECUTE 'ANALYZE contactos';
+        RAISE NOTICE 'ANALYZE ejecutado en contactos';
+    END IF;
+
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'profiles') THEN
+        EXECUTE 'ANALYZE profiles';
+        RAISE NOTICE 'ANALYZE ejecutado en profiles';
+    END IF;
+END $$;
 
 -- ================================================================
 -- VERIFICACIÓN DE ÍNDICES

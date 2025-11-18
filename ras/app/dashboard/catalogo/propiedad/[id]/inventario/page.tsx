@@ -25,7 +25,7 @@ interface InventoryItem {
 
 interface PropertyData {
   id: string;
-  nombre: string;
+  nombre_propiedad: string;
   tipo_propiedad: string;
 }
 
@@ -59,14 +59,20 @@ export default function InventarioPage() {
   }, [propertyId]);
 
   const checkUser = async () => {
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser) { 
-      router.push('/login'); 
-      return; 
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        router.push('/login');
+        return;
+      }
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
+      setUser({ ...profile, id: authUser.id });
+      loadData();
+    } catch (error) {
+      console.error('Error en checkUser:', error);
+      toast.error('Error de autenticación');
+      setLoading(false);
     }
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
-    setUser({ ...profile, id: authUser.id });
-    loadData();
   };
 
   const loadData = async () => {
@@ -76,24 +82,17 @@ export default function InventarioPage() {
       // Cargar propiedad
       const { data: propertyData, error: propError } = await supabase
         .from('propiedades')
-        .select('id, nombre, tipo_propiedad')
+        .select('id, nombre_propiedad, tipo_propiedad')
         .eq('id', propertyId)
         .single();
 
       if (propError) throw propError;
       setProperty(propertyData);
 
-      // Cargar espacios de la propiedad
-      const { data: spacesData } = await supabase
-        .from('property_spaces')
-        .select('id, nombre')
-        .eq('property_id', propertyId)
-        .order('nombre');
-      
-      setSpaces(spacesData || []);
-
-      // Cargar inventario
-      await loadInventory();
+      // NOTA: Las tablas property_spaces y property_inventory aún no existen
+      // Esta funcionalidad se implementará en una fase futura
+      setSpaces([]);
+      setInventory([]);
 
     } catch (error: any) {
       logger.error('Error cargando datos:', error);

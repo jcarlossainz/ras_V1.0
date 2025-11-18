@@ -40,7 +40,7 @@ export default function AnuncioEditPage() {
   const params = useParams()
   const toast = useToast()
   const confirm = useConfirm()
-  const { user, loading: authLoading, isAuthenticated } = useAuth()
+  const { user, loading: authLoading } = useAuth()
 
   const propiedadId = params?.id as string
 
@@ -54,10 +54,10 @@ export default function AnuncioEditPage() {
   const [estadoAnuncio, setEstadoAnuncio] = useState<'borrador' | 'publicado' | 'pausado'>('borrador')
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
+    if (!authLoading && user) {
       cargarDatos()
     }
-  }, [authLoading, isAuthenticated])
+  }, [authLoading, user, cargarDatos])
 
   const cargarDatos = useCallback(async () => {
     if (!propiedadId) return

@@ -27,7 +27,7 @@ export default function GaleriaPage() {
   const propertyId = params.id as string
   const toast = useToast()
   const confirm = useConfirm()
-  const { user, loading: authLoading, isAuthenticated } = useAuth()
+  const { user, loading: authLoading } = useAuth()
 
   const [property, setProperty] = useState<PropertyFormData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -43,10 +43,10 @@ export default function GaleriaPage() {
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
   useEffect(() => {
-    if (isAuthenticated && user && propertyId) {
+    if (!authLoading && user && propertyId) {
       loadProperty()
     }
-  }, [isAuthenticated, user, propertyId])
+  }, [authLoading, user, propertyId, loadProperty])
 
   const loadProperty = useCallback(async () => {
     try {

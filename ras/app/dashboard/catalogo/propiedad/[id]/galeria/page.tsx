@@ -364,36 +364,8 @@ export default function GaleriaPage() {
       />
 
       <main className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
-        {/* Header con botón subir fotos */}
+        {/* Filtros */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800 font-poppins">
-                📸 Galería de Fotos
-              </h2>
-              <p className="text-gray-600 mt-1">
-                {photos.length} {photos.length === 1 ? 'foto' : 'fotos'}
-              </p>
-            </div>
-
-            {photos.length > 0 && (
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handleFileSelect}
-                  disabled={isUploading}
-                  className="hidden"
-                />
-                <div className="px-6 py-3 bg-gradient-to-r from-ras-azul to-ras-turquesa text-white rounded-xl font-semibold hover:shadow-xl transition-all hover:scale-105 active:scale-95">
-                  {isUploading ? '⏳ Subiendo...' : '📸 Subir Fotos'}
-                </div>
-              </label>
-            )}
-          </div>
-
-          {/* Filtros */}
           <div className="flex flex-col md:flex-row gap-4">
             {/* Buscador */}
             <div className="flex-1">
@@ -429,6 +401,23 @@ export default function GaleriaPage() {
                 <polyline points="6 9 12 15 18 9"/>
               </svg>
             </div>
+
+            {/* Botón subir fotos */}
+            {photos.length > 0 && (
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  disabled={isUploading}
+                  className="hidden"
+                />
+                <div className="px-6 py-2 bg-gradient-to-r from-ras-azul to-ras-turquesa text-white rounded-lg font-semibold hover:shadow-lg transition-all hover:scale-105 active:scale-95 whitespace-nowrap">
+                  {isUploading ? '⏳ Subiendo...' : '📸 Subir'}
+                </div>
+              </label>
+            )}
           </div>
         </div>
 

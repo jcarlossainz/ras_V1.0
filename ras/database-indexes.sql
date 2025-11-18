@@ -1,0 +1,225 @@
+-- ================================================================
+-- ÍNDICES OPTIMIZADOS PARA SISTEMA RAS
+-- ================================================================
+-- Este archivo contiene todos los índices necesarios para optimizar
+-- el rendimiento del sistema con 10,000+ propiedades y 1000+ usuarios
+--
+-- IMPORTANTE: Ejecutar estos índices EN ORDEN en Supabase SQL Editor
+-- ================================================================
+
+-- ================================================================
+-- 1. ÍNDICES PARA TABLA: propiedades
+-- ================================================================
+
+-- Índice para búsqueda por owner_id (query más frecuente)
+CREATE INDEX IF NOT EXISTS idx_propiedades_owner_id
+ON propiedades(owner_id);
+
+-- Índice para ordenar por fecha de creación
+CREATE INDEX IF NOT EXISTS idx_propiedades_created_at
+ON propiedades(created_at DESC);
+
+-- Índice compuesto para queries combinadas (owner + fecha)
+CREATE INDEX IF NOT EXISTS idx_propiedades_owner_created
+ON propiedades(owner_id, created_at DESC);
+
+-- Índice para búsqueda por nombre (con LOWER para case-insensitive)
+CREATE INDEX IF NOT EXISTS idx_propiedades_nombre
+ON propiedades(LOWER(nombre_propiedad) text_pattern_ops);
+
+-- Índice para estado de publicación
+CREATE INDEX IF NOT EXISTS idx_propiedades_published
+ON propiedades(published_at)
+WHERE published_at IS NOT NULL;
+
+-- ================================================================
+-- 2. ÍNDICES PARA TABLA: propiedades_colaboradores
+-- ================================================================
+
+-- Índice para buscar colaboraciones por usuario
+CREATE INDEX IF NOT EXISTS idx_colaboradores_user_id
+ON propiedades_colaboradores(user_id);
+
+-- Índice para buscar colaboradores de una propiedad
+CREATE INDEX IF NOT EXISTS idx_colaboradores_propiedad_id
+ON propiedades_colaboradores(propiedad_id);
+
+-- Índice compuesto para joins frecuentes
+CREATE INDEX IF NOT EXISTS idx_colaboradores_user_propiedad
+ON propiedades_colaboradores(user_id, propiedad_id);
+
+-- ================================================================
+-- 3. ÍNDICES PARA TABLA: property_images
+-- ================================================================
+
+-- Índice para buscar imágenes de una propiedad
+CREATE INDEX IF NOT EXISTS idx_images_property_id
+ON property_images(property_id);
+
+-- Índice para foto de portada (query muy frecuente)
+CREATE INDEX IF NOT EXISTS idx_images_cover
+ON property_images(property_id, is_cover)
+WHERE is_cover = true;
+
+-- Índice para orden de fotos
+CREATE INDEX IF NOT EXISTS idx_images_order
+ON property_images(property_id, order_index);
+
+-- ================================================================
+-- 4. ÍNDICES PARA TABLA: property_inventory
+-- ================================================================
+
+-- Índice para buscar inventario por propiedad
+CREATE INDEX IF NOT EXISTS idx_inventory_property_id
+ON property_inventory(property_id);
+
+-- Índice para buscar por espacio
+CREATE INDEX IF NOT EXISTS idx_inventory_space_type
+ON property_inventory(space_type);
+
+-- Índice compuesto para filtros frecuentes
+CREATE INDEX IF NOT EXISTS idx_inventory_property_space
+ON property_inventory(property_id, space_type);
+
+-- ================================================================
+-- 5. ÍNDICES PARA TABLA: tickets (si existe)
+-- ================================================================
+
+-- Nota: Crear si la tabla existe
+CREATE INDEX IF NOT EXISTS idx_tickets_property_id
+ON tickets(property_id);
+
+CREATE INDEX IF NOT EXISTS idx_tickets_status
+ON tickets(status);
+
+CREATE INDEX IF NOT EXISTS idx_tickets_fecha
+ON tickets(fecha_vencimiento);
+
+CREATE INDEX IF NOT EXISTS idx_tickets_property_status
+ON tickets(property_id, status);
+
+-- ================================================================
+-- 6. ÍNDICES PARA TABLA: fechas_pago_servicios
+-- ================================================================
+
+CREATE INDEX IF NOT EXISTS idx_pagos_propiedad_id
+ON fechas_pago_servicios(propiedad_id);
+
+CREATE INDEX IF NOT EXISTS idx_pagos_fecha
+ON fechas_pago_servicios(fecha_pago);
+
+CREATE INDEX IF NOT EXISTS idx_pagos_pagado
+ON fechas_pago_servicios(pagado)
+WHERE pagado = false;
+
+-- Índice compuesto para dashboard (pagos pendientes por propiedad)
+CREATE INDEX IF NOT EXISTS idx_pagos_propiedad_pendientes
+ON fechas_pago_servicios(propiedad_id, pagado, fecha_pago)
+WHERE pagado = false;
+
+-- ================================================================
+-- 7. ÍNDICES PARA TABLA: servicios_inmueble
+-- ================================================================
+
+CREATE INDEX IF NOT EXISTS idx_servicios_propiedad_id
+ON servicios_inmueble(propiedad_id);
+
+CREATE INDEX IF NOT EXISTS idx_servicios_activo
+ON servicios_inmueble(activo)
+WHERE activo = true;
+
+-- ================================================================
+-- 8. ÍNDICES PARA TABLA: contactos
+-- ================================================================
+
+CREATE INDEX IF NOT EXISTS idx_contactos_user_id
+ON contactos(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_contactos_tipo
+ON contactos(tipo);
+
+-- Índice para búsqueda por nombre
+CREATE INDEX IF NOT EXISTS idx_contactos_nombre
+ON contactos(LOWER(full_name) text_pattern_ops);
+
+-- ================================================================
+-- 9. ÍNDICES PARA TABLA: profiles
+-- ================================================================
+
+-- Índice para búsqueda por email
+CREATE INDEX IF NOT EXISTS idx_profiles_email
+ON profiles(LOWER(email) text_pattern_ops);
+
+-- Índice para empresa
+CREATE INDEX IF NOT EXISTS idx_profiles_empresa_id
+ON profiles(empresa_id)
+WHERE empresa_id IS NOT NULL;
+
+-- ================================================================
+-- 10. ESTADÍSTICAS Y ANÁLISIS
+-- ================================================================
+
+-- Actualizar estadísticas de la base de datos
+ANALYZE propiedades;
+ANALYZE propiedades_colaboradores;
+ANALYZE property_images;
+ANALYZE property_inventory;
+ANALYZE fechas_pago_servicios;
+ANALYZE servicios_inmueble;
+ANALYZE contactos;
+ANALYZE profiles;
+
+-- ================================================================
+-- VERIFICACIÓN DE ÍNDICES
+-- ================================================================
+-- Ejecuta esta query para verificar todos los índices creados:
+/*
+SELECT
+  schemaname,
+  tablename,
+  indexname,
+  indexdef
+FROM pg_indexes
+WHERE schemaname = 'public'
+  AND tablename IN (
+    'propiedades',
+    'propiedades_colaboradores',
+    'property_images',
+    'property_inventory',
+    'tickets',
+    'fechas_pago_servicios',
+    'servicios_inmueble',
+    'contactos',
+    'profiles'
+  )
+ORDER BY tablename, indexname;
+*/
+
+-- ================================================================
+-- NOTAS IMPORTANTES
+-- ================================================================
+/*
+1. IMPACTO ESPERADO:
+   - Queries de catálogo: 10x más rápidas
+   - Joins: 5-10x más rápidos
+   - Búsquedas: 20x más rápidas
+   - Dashboard: 5x más rápido
+
+2. MANTENIMIENTO:
+   - Los índices se mantienen automáticamente
+   - Ejecutar ANALYZE mensualmente si hay mucho cambio de datos
+
+3. MONITOREO:
+   - Usar EXPLAIN ANALYZE para verificar que los índices se usan
+   - Ejemplo: EXPLAIN ANALYZE SELECT * FROM propiedades WHERE owner_id = 'xxx';
+
+4. ORDEN DE EJECUCIÓN:
+   - Ejecutar índices de propiedades primero
+   - Luego índices de tablas relacionadas
+   - Finalmente ANALYZE
+
+5. TIEMPO DE CREACIÓN:
+   - Con base de datos vacía: < 1 segundo
+   - Con 10,000 propiedades: 5-10 segundos
+   - Con 100,000 registros: 30-60 segundos
+*/

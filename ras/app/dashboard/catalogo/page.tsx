@@ -1,16 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback, lazy, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
+import useSWR from 'swr'
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/useToast'
 import { useConfirm } from '@/components/ui/confirm-modal'
 import { logger } from '@/lib/logger'
-import WizardModal from './nueva/components/WizardModal'
-import CompartirPropiedad from '@/components/CompartirPropiedad'
 import TopBar from '@/components/ui/topbar'
 import Loading from '@/components/ui/loading'
 import EmptyState from '@/components/ui/emptystate'
+
+// ⚡ LAZY LOADING: Modales pesados solo se cargan cuando se necesitan
+const WizardModal = lazy(() => import('./nueva/components/WizardModal'))
+const CompartirPropiedad = lazy(() => import('@/components/CompartirPropiedad'))
 
 interface Propiedad {
   id: string
@@ -55,112 +58,157 @@ export default function CatalogoPage() {
     setLoading(false)
   }
 
+  // ⚡ OPTIMIZADO: Carga con JOINs - solo 3 queries máximo
   const cargarPropiedades = async (userId: string) => {
-    // ✅ ACTUALIZADO: usar owner_id en lugar de user_id
-    const { data: propiedadesPropias } = await supabase
-      .from('propiedades')
-      .select('id, owner_id, nombre_propiedad, created_at')
-      .eq('owner_id', userId)
-      .order('created_at', { ascending: false })
-    
-    const { data: propiedadesCompartidas } = await supabase
-      .from('propiedades_colaboradores')
-      .select('propiedad_id')
-      .eq('user_id', userId)
-    
-    let propiedadesCompartidasData: any[] = []
-    if (propiedadesCompartidas && propiedadesCompartidas.length > 0) {
-      const idsCompartidos = propiedadesCompartidas.map(p => p.propiedad_id)
-      const { data: datosCompartidos } = await supabase
+    try {
+      // Query 1: Propiedades propias con todos los datos en un solo JOIN
+      const { data: propiedadesPropias, error: errorPropias } = await supabase
         .from('propiedades')
-        .select('id, owner_id, nombre_propiedad, created_at')
-        .in('id', idsCompartidos)
-      propiedadesCompartidasData = datosCompartidos || []
-    }
-    
-    const todasPropiedades = [
-      ...(propiedadesPropias || []).map(p => ({ 
-        ...p, 
-        nombre: p.nombre_propiedad,
-        es_propio: true 
-      })),
-      ...(propiedadesCompartidasData || []).map(p => ({ 
-        ...p, 
-        nombre: p.nombre_propiedad,
-        es_propio: false 
-      }))
-    ]
-    
-    for (const prop of todasPropiedades) {
-      const { data: colaboradores } = await supabase
-        .from('propiedades_colaboradores')
         .select(`
-          user_id,
-          profiles:user_id (
-            nombre:nombre,
-            email:email
+          id,
+          owner_id,
+          nombre_propiedad,
+          codigo_postal,
+          created_at,
+          propiedades_colaboradores (
+            user_id,
+            profiles:user_id (
+              nombre,
+              email
+            )
+          ),
+          property_images!inner (
+            url_thumbnail
           )
         `)
-        .eq('propiedad_id', prop.id)
-      
-      prop.colaboradores = colaboradores?.map(c => ({
-        user_id: c.user_id,
-        nombre: (c as any).profiles?.nombre || 'Sin nombre',
-        email: (c as any).profiles?.email || 'Sin email'
-      })) || []
-      
-      const { data: fotoPortada } = await supabase
-        .from('property_images')
-        .select('url_thumbnail')
-        .eq('property_id', prop.id)
-        .eq('is_cover', true)
-        .single()
-      
-      prop.foto_portada = fotoPortada?.url_thumbnail || null
+        .eq('owner_id', userId)
+        .eq('property_images.is_cover', true)
+        .order('created_at', { ascending: false })
+        .limit(100) // Paginación: primeras 100
+
+      if (errorPropias) {
+        logger.error('Error cargando propiedades propias:', errorPropias)
+      }
+
+      // Query 2: IDs de propiedades compartidas
+      const { data: propiedadesCompartidas } = await supabase
+        .from('propiedades_colaboradores')
+        .select('propiedad_id')
+        .eq('user_id', userId)
+
+      let propiedadesCompartidasData: any[] = []
+
+      // Query 3: Propiedades compartidas con JOINs (solo si hay compartidas)
+      if (propiedadesCompartidas && propiedadesCompartidas.length > 0) {
+        const idsCompartidos = propiedadesCompartidas.map(p => p.propiedad_id)
+        const { data: datosCompartidos } = await supabase
+          .from('propiedades')
+          .select(`
+            id,
+            owner_id,
+            nombre_propiedad,
+            codigo_postal,
+            created_at,
+            propiedades_colaboradores (
+              user_id,
+              profiles:user_id (
+                nombre,
+                email
+              )
+            ),
+            property_images (
+              url_thumbnail
+            )
+          `)
+          .in('id', idsCompartidos)
+          .eq('property_images.is_cover', true)
+          .limit(100)
+
+        propiedadesCompartidasData = datosCompartidos || []
+      }
+
+      // Transformar datos (sin loops adicionales)
+      const todasPropiedades = [
+        ...(propiedadesPropias || []).map(p => ({
+          id: p.id,
+          owner_id: p.owner_id,
+          nombre: p.nombre_propiedad,
+          codigo_postal: p.codigo_postal,
+          created_at: p.created_at,
+          es_propio: true,
+          foto_portada: p.property_images?.[0]?.url_thumbnail || null,
+          colaboradores: (p.propiedades_colaboradores || []).map((c: any) => ({
+            user_id: c.user_id,
+            nombre: c.profiles?.nombre || 'Sin nombre',
+            email: c.profiles?.email || 'Sin email'
+          }))
+        })),
+        ...(propiedadesCompartidasData || []).map(p => ({
+          id: p.id,
+          owner_id: p.owner_id,
+          nombre: p.nombre_propiedad,
+          codigo_postal: p.codigo_postal,
+          created_at: p.created_at,
+          es_propio: false,
+          foto_portada: p.property_images?.[0]?.url_thumbnail || null,
+          colaboradores: (p.propiedades_colaboradores || []).map((c: any) => ({
+            user_id: c.user_id,
+            nombre: c.profiles?.nombre || 'Sin nombre',
+            email: c.profiles?.email || 'Sin email'
+          }))
+        }))
+      ]
+
+      setPropiedades(todasPropiedades)
+      logger.log(`✅ Cargadas ${todasPropiedades.length} propiedades en 3 queries`)
+
+    } catch (error: any) {
+      logger.error('Error cargando propiedades:', error)
+      toast.error('Error al cargar propiedades')
+      setPropiedades([])
     }
-    
-    setPropiedades(todasPropiedades)
   }
 
-  const abrirCompartir = (propiedad: Propiedad) => {
+  // ⚡ OPTIMIZADO: Funciones memoizadas para evitar re-renders
+  const abrirCompartir = useCallback((propiedad: Propiedad) => {
     setPropiedadSeleccionada(propiedad)
     setShowCompartir(true)
-  }
+  }, [])
 
-  const abrirHome = (propiedadId: string) => {
+  const abrirHome = useCallback((propiedadId: string) => {
     router.push(`/dashboard/propiedad/${propiedadId}/home`)
-  }
+  }, [router])
 
-  const abrirGaleria = (propiedadId: string) => {
+  const abrirGaleria = useCallback((propiedadId: string) => {
     router.push(`/dashboard/propiedad/${propiedadId}/galeria`)
-  }
+  }, [router])
 
-  const abrirInventario = (propiedadId: string) => {
+  const abrirInventario = useCallback((propiedadId: string) => {
     router.push(`/dashboard/propiedad/${propiedadId}/inventario`)
-  }
+  }, [router])
 
-  const abrirTickets = (propiedadId: string) => {
+  const abrirTickets = useCallback((propiedadId: string) => {
     router.push(`/dashboard/propiedad/${propiedadId}/tickets`)
-  }
+  }, [router])
 
-  const abrirCalendario = (propiedadId: string) => {
+  const abrirCalendario = useCallback((propiedadId: string) => {
     router.push(`/dashboard/propiedad/${propiedadId}/calendario`)
-  }
+  }, [router])
 
-  const abrirBalance = (propiedadId: string) => {
+  const abrirBalance = useCallback((propiedadId: string) => {
     router.push(`/dashboard/propiedad/${propiedadId}/cuentas`)
-  }
+  }, [router])
 
-  const abrirAnuncio = (propiedadId: string) => {
+  const abrirAnuncio = useCallback((propiedadId: string) => {
     router.push(`/dashboard/anuncio/${propiedadId}`)
-  }
+  }, [router])
 
-  const editarPropiedad = (propiedadId: string) => {
+  const editarPropiedad = useCallback((propiedadId: string) => {
     toast.info('Función de edición en desarrollo')
     logger.log('Editar propiedad:', propiedadId)
-  }
+  }, [toast])
 
-  const eliminarPropiedad = async (propiedadId: string, nombrePropiedad: string) => {
+  const eliminarPropiedad = useCallback(async (propiedadId: string, nombrePropiedad: string) => {
     if (!user?.id) return
 
     const confirmed = await confirm.danger(
@@ -171,7 +219,6 @@ export default function CatalogoPage() {
     if (!confirmed) return
 
     try {
-      // ✅ ACTUALIZADO: usar owner_id
       const { error } = await supabase
         .from('propiedades')
         .delete()
@@ -186,30 +233,33 @@ export default function CatalogoPage() {
       logger.error('Error al eliminar propiedad:', error)
       toast.error('Error al eliminar la propiedad')
     }
-  }
+  }, [user?.id, confirm, toast])
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     const confirmed = await confirm.warning('¿Cerrar sesión?')
     if (!confirmed) return
-    
+
     await supabase.auth.signOut()
     router.push('/login')
-  }
+  }, [confirm, router])
 
-  const handleCloseWizard = () => {
+  const handleCloseWizard = useCallback(() => {
     setShowWizard(false)
-  }
+  }, [])
 
-  const propiedadesFiltradas = propiedades.filter(prop => {
-    const cumpleBusqueda = prop.nombre.toLowerCase().includes(busqueda.toLowerCase())
-    
-    const cumpleFiltro = 
-      filtroPropiedad === 'todos' ||
-      (filtroPropiedad === 'propios' && prop.es_propio) ||
-      (filtroPropiedad === 'compartidos' && !prop.es_propio)
-    
-    return cumpleBusqueda && cumpleFiltro
-  })
+  // ⚡ OPTIMIZADO: Filtros memoizados - solo se recalculan cuando cambian las dependencias
+  const propiedadesFiltradas = useMemo(() => {
+    return propiedades.filter(prop => {
+      const cumpleBusqueda = prop.nombre.toLowerCase().includes(busqueda.toLowerCase())
+
+      const cumpleFiltro =
+        filtroPropiedad === 'todos' ||
+        (filtroPropiedad === 'propios' && prop.es_propio) ||
+        (filtroPropiedad === 'compartidos' && !prop.es_propio)
+
+      return cumpleBusqueda && cumpleFiltro
+    })
+  }, [propiedades, busqueda, filtroPropiedad])
 
   if (loading) {
     return <Loading message="Cargando propiedades..." />
@@ -429,38 +479,43 @@ export default function CatalogoPage() {
         )}
       </main>
 
+      {/* ⚡ LAZY LOADING: Modales con Suspense */}
       {showCompartir && propiedadSeleccionada && (
-        <CompartirPropiedad
-          isOpen={showCompartir}
-          onClose={() => {
-            setShowCompartir(false)
-            setPropiedadSeleccionada(null)
-            if (user?.id) cargarPropiedades(user.id)
-          }}
-          propiedadId={propiedadSeleccionada.id}
-          propiedadNombre={propiedadSeleccionada.nombre}
-          userId={user.id}
-          esPropio={propiedadSeleccionada.es_propio}
-        />
+        <Suspense fallback={<Loading message="Cargando opciones de compartir..." />}>
+          <CompartirPropiedad
+            isOpen={showCompartir}
+            onClose={() => {
+              setShowCompartir(false)
+              setPropiedadSeleccionada(null)
+              if (user?.id) cargarPropiedades(user.id)
+            }}
+            propiedadId={propiedadSeleccionada.id}
+            propiedadNombre={propiedadSeleccionada.nombre}
+            userId={user.id}
+            esPropio={propiedadSeleccionada.es_propio}
+          />
+        </Suspense>
       )}
 
       {showWizard && (
-        <WizardModal
-          isOpen={showWizard}
-          onClose={handleCloseWizard}
-          mode="create"
-          onComplete={async (propertyId) => {
-            console.log('🎉 Propiedad creada con ID:', propertyId);
-            
-            // Recargar lista de propiedades
-            if (user?.id) {
-              await cargarPropiedades(user.id);
-            }
-            
-            // Mostrar toast de éxito
-            toast.success('✅ Propiedad creada exitosamente');
-          }}
-        />
+        <Suspense fallback={<Loading message="Cargando formulario..." />}>
+          <WizardModal
+            isOpen={showWizard}
+            onClose={handleCloseWizard}
+            mode="create"
+            onComplete={async (propertyId) => {
+              logger.log('🎉 Propiedad creada con ID:', propertyId);
+
+              // Recargar lista de propiedades
+              if (user?.id) {
+                await cargarPropiedades(user.id);
+              }
+
+              // Mostrar toast de éxito
+              toast.success('✅ Propiedad creada exitosamente');
+            }}
+          />
+        </Suspense>
       )}
     </div>
   )

@@ -161,31 +161,31 @@ export default function CatalogoPage() {
   }, [])
 
   const abrirHome = useCallback((propiedadId: string) => {
-    router.push(`/dashboard/propiedad/${propiedadId}/home`)
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/home`)
   }, [router])
 
   const abrirGaleria = useCallback((propiedadId: string) => {
-    router.push(`/dashboard/propiedad/${propiedadId}/galeria`)
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/galeria`)
   }, [router])
 
   const abrirInventario = useCallback((propiedadId: string) => {
-    router.push(`/dashboard/propiedad/${propiedadId}/inventario`)
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/inventario`)
   }, [router])
 
   const abrirTickets = useCallback((propiedadId: string) => {
-    router.push(`/dashboard/propiedad/${propiedadId}/tickets`)
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/tickets`)
   }, [router])
 
   const abrirCalendario = useCallback((propiedadId: string) => {
-    router.push(`/dashboard/propiedad/${propiedadId}/calendario`)
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/calendario`)
   }, [router])
 
   const abrirBalance = useCallback((propiedadId: string) => {
-    router.push(`/dashboard/propiedad/${propiedadId}/cuentas`)
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/balance`)
   }, [router])
 
   const abrirAnuncio = useCallback((propiedadId: string) => {
-    router.push(`/dashboard/anuncio/${propiedadId}`)
+    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/anuncio`)
   }, [router])
 
   const editarPropiedad = useCallback((propiedadId: string) => {

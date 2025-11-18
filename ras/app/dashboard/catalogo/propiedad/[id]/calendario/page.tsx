@@ -67,7 +67,8 @@ export default function CalendarioPropiedadPage() {
         cargarDatos()
       }
     }
-  }, [authLoading, user, cargarDatos])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user])
 
   useEffect(() => {
     if (pagos.length >= 0) {

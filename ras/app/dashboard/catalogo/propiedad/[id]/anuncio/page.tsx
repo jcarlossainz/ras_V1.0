@@ -57,7 +57,8 @@ export default function AnuncioEditPage() {
     if (!authLoading && user) {
       cargarDatos()
     }
-  }, [authLoading, user, cargarDatos])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user])
 
   const cargarDatos = useCallback(async () => {
     if (!propiedadId) return

@@ -46,7 +46,8 @@ export default function GaleriaPage() {
     if (!authLoading && user && propertyId) {
       loadProperty()
     }
-  }, [authLoading, user, propertyId, loadProperty])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user, propertyId])
 
   const loadProperty = useCallback(async () => {
     try {

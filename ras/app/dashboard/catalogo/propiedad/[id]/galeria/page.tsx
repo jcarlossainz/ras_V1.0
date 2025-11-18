@@ -1,136 +1,118 @@
-// 📁 src/app/dashboard/propiedad/[id]/galeria/page.tsx
-// ✅ PLAN C APLICADO - Alerts y Confirms profesionales
-'use client';
+'use client'
 
-import { useParams, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
-import { getPropertyImages } from '@/lib/supabase/supabase-storage';
-import { supabase } from '@/lib/supabase/client';
-import { compressImageDual } from '@/lib/supabase/image-compression';
-import { uploadPropertyImageDual } from '@/lib/supabase/supabase-storage';
-import TopBar from '@/components/ui/topbar';
-import Loading from '@/components/ui/loading';
-import EmptyState from '@/components/ui/emptystate';
-import type { PropertyFormData, PropertyImage } from '@/types/property';
+/**
+ * GALERÍA DE PROPIEDAD
+ * Sistema completo de gestión de fotos con lightbox
+ * Optimizado con useAuth y useCallback
+ */
 
-// ✅ PLAN C: Imports de notificaciones profesionales
-import { useToast } from '@/hooks/useToast';
-import { useConfirm } from '@/components/ui/confirm-modal';
-import { logger } from '@/lib/logger';
+import { useParams, useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback } from 'react'
+import { getPropertyImages } from '@/lib/supabase/supabase-storage'
+import { supabase } from '@/lib/supabase/client'
+import { compressImageDual } from '@/lib/supabase/image-compression'
+import { uploadPropertyImageDual } from '@/lib/supabase/supabase-storage'
+import TopBar from '@/components/ui/topbar'
+import Loading from '@/components/ui/loading'
+import EmptyState from '@/components/ui/emptystate'
+import type { PropertyFormData, PropertyImage } from '@/types/property'
+import { useToast } from '@/hooks/useToast'
+import { useConfirm } from '@/components/ui/confirm-modal'
+import { useAuth } from '@/hooks/useAuth'
+import { logger } from '@/lib/logger'
 
 export default function GaleriaPage() {
-  const params = useParams();
-  const router = useRouter();
-  const propertyId = params.id as string;
+  const params = useParams()
+  const router = useRouter()
+  const propertyId = params.id as string
+  const toast = useToast()
+  const confirm = useConfirm()
+  const { user, loading: authLoading, isAuthenticated } = useAuth()
 
-  // ✅ PLAN C: Hooks de notificaciones
-  const toast = useToast();
-  const confirm = useConfirm();
+  const [property, setProperty] = useState<PropertyFormData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [photos, setPhotos] = useState<PropertyImage[]>([])
+  const [selectedSpace, setSelectedSpace] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null)
+  const [editingCaption, setEditingCaption] = useState('')
 
-  const [user, setUser] = useState<any>(null);
-  const [property, setProperty] = useState<PropertyFormData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [photos, setPhotos] = useState<PropertyImage[]>([]);
-  const [selectedSpace, setSelectedSpace] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
-  const [editingCaption, setEditingCaption] = useState('');
+  // Lightbox state
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
 
   useEffect(() => {
-    checkUser();
-  }, [propertyId]);
-
-  const checkUser = async () => {
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser) { 
-      router.push('/login'); 
-      return; 
+    if (isAuthenticated && user && propertyId) {
+      loadProperty()
     }
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
-    setUser({ ...profile, id: authUser.id });
-    loadProperty();
-  };
+  }, [isAuthenticated, user, propertyId])
 
-  const loadProperty = async () => {
+  const loadProperty = useCallback(async () => {
     try {
-      setLoading(true);
-      
-      // 1. Cargar propiedad desde tabla propiedades
-      console.log('🔍 Cargando propiedad:', propertyId);
+      setLoading(true)
+
+      // Cargar propiedad desde tabla propiedades
       const { data: propertyData, error: propertyError } = await supabase
         .from('propiedades')
-        .select('*')
+        .select('id, nombre_propiedad, tipo_propiedad, estados, espacios')
         .eq('id', propertyId)
-        .single();
+        .single()
 
-      // 2. Si no existe, mostrar error
-      if (propertyError) {
-        console.error('❌ Propiedad no encontrada:', propertyError);
-        throw propertyError;
-      }
+      if (propertyError) throw propertyError
 
-      // 3. Cargar fotos
-      console.log('📸 Cargando fotos...');
-      const photosData = await getPropertyImages(propertyId);
-      console.log(`✅ ${photosData.length} fotos encontradas`);
+      // Cargar fotos
+      const photosData = await getPropertyImages(propertyId)
 
-      // 4. Preparar espacios desde la BD
-      let propertySpaces = [];
-      
-      if (propertyData?.espacios && Array.isArray(propertyData.espacios) && propertyData.espacios.length > 0) {
-        // Mapear espacios reales del usuario
+      // Preparar espacios desde la BD
+      let propertySpaces = []
+
+      if (
+        propertyData?.espacios &&
+        Array.isArray(propertyData.espacios) &&
+        propertyData.espacios.length > 0
+      ) {
         propertySpaces = propertyData.espacios.map((espacio: any) => ({
           id: espacio.id || espacio.type,
           name: espacio.name,
           type: espacio.type,
           icon: getEspacioIcon(espacio.type)
-        }));
-        console.log('✅ Usando espacios reales del usuario:', propertySpaces.length);
+        }))
       } else {
-        // Espacios por defecto solo si no hay ninguno
         propertySpaces = [
           { id: 'sala', name: 'Sala', type: 'Sala', icon: '🛋️' },
           { id: 'cocina', name: 'Cocina', type: 'Cocina', icon: '🍳' },
           { id: 'recamara', name: 'Recámara', type: 'Habitación', icon: '🛏️' },
-          { id: 'bano', name: 'Baño', type: 'Baño completo', icon: '🚿' },
-        ];
-        console.log('⚠️ Usando espacios por defecto');
+          { id: 'bano', name: 'Baño', type: 'Baño completo', icon: '🚿' }
+        ]
       }
-      
-      // Agregar "Sin espacio" y "General" al inicio
+
       const espaciosConOpciones = [
         { id: 'all', name: 'Todos', type: 'all', icon: '📋' },
         { id: 'sin-espacio', name: 'Sin espacio', type: 'sin-espacio', icon: '📦' },
         { id: 'general', name: 'General', type: 'general', icon: '🏠' },
         ...propertySpaces
-      ];
+      ]
 
-      // 5. Actualizar estado
       const propertyComplete: Partial<PropertyFormData> = {
         id: propertyId,
-        nombre_propiedad: propertyData?.nombre || 'Mi Propiedad',
+        nombre_propiedad: propertyData?.nombre_propiedad || 'Mi Propiedad',
         tipo_propiedad: propertyData?.tipo_propiedad || 'Casa',
         estados: propertyData?.estados || ['Disponible'],
         photos: photosData,
-        espacios: espaciosConOpciones,
-      };
+        espacios: espaciosConOpciones
+      }
 
-      setProperty(propertyComplete as PropertyFormData);
-      setPhotos(photosData);
-      console.log('✅ Propiedad cargada exitosamente con espacios:', espaciosConOpciones);
-
+      setProperty(propertyComplete as PropertyFormData)
+      setPhotos(photosData)
     } catch (error) {
-      // ✅ PLAN C: Reemplazo de alert() por toast.error()
-      logger.error('Error al cargar propiedad:', error);
-      toast.error('Error al cargar la propiedad', {
-        duration: 5000
-      });
-      router.push('/dashboard/catalogo');
+      logger.error('Error al cargar propiedad:', error)
+      toast.error('Error al cargar la propiedad')
+      router.push('/dashboard/catalogo')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }, [propertyId, toast, router])
 
   // Función helper para obtener iconos según el tipo de espacio
   const getEspacioIcon = (type: string): string => {
@@ -155,234 +137,219 @@ export default function GaleriaPage() {
     return iconMap[type] || '📍';
   };
 
-  // ✅ PLAN C: Logout con confirmación profesional
-  const handleLogout = async () => {
-    const confirmed = await confirm.default(
-      '¿Cerrar sesión?',
-      'Tendrás que volver a iniciar sesión'
-    );
-    
-    if (confirmed) {
-      await supabase.auth.signOut();
-      toast.info('Sesión cerrada correctamente');
-      router.push('/login');
-    }
-  };
+  const openLightbox = useCallback((index: number) => {
+    setLightboxIndex(index)
+    setLightboxOpen(true)
+    document.body.style.overflow = 'hidden'
+  }, [])
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const closeLightbox = useCallback(() => {
+    setLightboxOpen(false)
+    document.body.style.overflow = 'auto'
+  }, [])
 
-    setIsUploading(true);
+  const nextImage = useCallback(() => {
+    const currentFiltered = photos.filter(photo => {
+      const matchesSpace = selectedSpace === 'all' || photo.space_type === selectedSpace
+      const matchesSearch =
+        photo.caption?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false
+      return matchesSpace && (searchQuery === '' || matchesSearch)
+    })
+    setLightboxIndex(prev => (prev + 1) % currentFiltered.length)
+  }, [photos, selectedSpace, searchQuery])
 
-    try {
-      const newPhotos: PropertyImage[] = [];
+  const prevImage = useCallback(() => {
+    const currentFiltered = photos.filter(photo => {
+      const matchesSpace = selectedSpace === 'all' || photo.space_type === selectedSpace
+      const matchesSearch =
+        photo.caption?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false
+      return matchesSpace && (searchQuery === '' || matchesSearch)
+    })
+    setLightboxIndex(prev => (prev - 1 + currentFiltered.length) % currentFiltered.length)
+  }, [photos, selectedSpace, searchQuery])
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        
-        try {
-          console.log(`📸 Procesando ${file.name}...`);
-          
-          // 1. Comprimir imagen
-          const compressed = await compressImageDual(file);
-          console.log(`✅ Comprimido: ${file.name}`);
+  const handleFileSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files
+      if (!files || files.length === 0) return
 
-          // 2. Subir a Supabase Storage
-          const uploaded = await uploadPropertyImageDual(
-            compressed.thumbnail,
-            compressed.display,
-            propertyId,
-            file.name
-          );
-          console.log(`✅ Subido: ${file.name}`);
+      setIsUploading(true)
 
-          // 3. Agregar a la lista
-          newPhotos.push({
-            id: uploaded.id,
-            url: uploaded.urls.display,
-            url_thumbnail: uploaded.urls.thumbnail,
-            is_cover: photos.length === 0 && i === 0,
-            caption: file.name,
-            created_at: new Date().toISOString(),
-            space_type: 'sin-espacio',
-            property_id: propertyId,
-          });
+      try {
+        const newPhotos: PropertyImage[] = []
 
-        } catch (fileError) {
-          // ✅ PLAN C: Error individual por archivo con toast
-          logger.error(`Error con archivo ${file.name}:`, fileError);
-          toast.error(`Error al subir ${file.name}`, {
-            duration: 4000
-          });
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i]
+
+          try {
+            const compressed = await compressImageDual(file)
+            const uploaded = await uploadPropertyImageDual(
+              compressed.thumbnail,
+              compressed.display,
+              propertyId,
+              file.name
+            )
+
+            newPhotos.push({
+              id: uploaded.id,
+              url: uploaded.urls.display,
+              url_thumbnail: uploaded.urls.thumbnail,
+              is_cover: photos.length === 0 && i === 0,
+              caption: file.name,
+              created_at: new Date().toISOString(),
+              space_type: 'sin-espacio',
+              property_id: propertyId
+            })
+          } catch (fileError) {
+            logger.error(`Error con archivo ${file.name}:`, fileError)
+            toast.error(`Error al subir ${file.name}`)
+          }
         }
+
+        if (newPhotos.length > 0) {
+          setPhotos([...photos, ...newPhotos])
+          toast.success(`${newPhotos.length} foto(s) subida(s) exitosamente`)
+        }
+      } catch (error) {
+        logger.error('Error al subir fotos:', error)
+        toast.error('Error al subir las fotos. Intenta nuevamente')
+      } finally {
+        setIsUploading(false)
+      }
+    },
+    [propertyId, photos, toast]
+  )
+
+  const handleSetCover = useCallback(
+    async (photoId: string) => {
+      try {
+        await supabase
+          .from('property_images')
+          .update({ is_cover: false })
+          .eq('property_id', propertyId)
+
+        await supabase.from('property_images').update({ is_cover: true }).eq('id', photoId)
+
+        setPhotos(
+          photos.map(photo => ({
+            ...photo,
+            is_cover: photo.id === photoId
+          }))
+        )
+
+        toast.success('Foto de portada actualizada')
+      } catch (error) {
+        logger.error('Error al establecer portada:', error)
+        toast.error('Error al establecer la foto de portada')
+      }
+    },
+    [propertyId, photos, toast]
+  )
+
+  const handleDelete = useCallback(
+    async (photoId: string) => {
+      const confirmed = await confirm.danger(
+        '¿Eliminar esta foto?',
+        'Esta acción no se puede deshacer'
+      )
+
+      if (!confirmed) return
+
+      try {
+        await supabase.from('property_images').delete().eq('id', photoId)
+
+        setPhotos(photos.filter(p => p.id !== photoId))
+
+        toast.success('Foto eliminada correctamente')
+      } catch (error) {
+        logger.error('Error al eliminar foto:', error)
+        toast.error('Error al eliminar la foto')
+      }
+    },
+    [photos, confirm, toast]
+  )
+
+  const handleAssignSpace = useCallback(
+    async (photoId: string, spaceType: string) => {
+      try {
+        await supabase.from('property_images').update({ space_type: spaceType }).eq('id', photoId)
+
+        setPhotos(
+          photos.map(photo => (photo.id === photoId ? { ...photo, space_type: spaceType } : photo))
+        )
+
+        const espacioNombre =
+          property?.espacios?.find(e => e.id === spaceType)?.name || spaceType
+
+        toast.success(`Foto asignada a: ${espacioNombre}`)
+      } catch (error) {
+        logger.error('Error al asignar espacio:', error)
+        toast.error('Error al asignar espacio')
+      }
+    },
+    [photos, property, toast]
+  )
+
+  const handleStartEdit = useCallback((photo: PropertyImage) => {
+    setEditingPhotoId(photo.id)
+    setEditingCaption(photo.caption || '')
+  }, [])
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingPhotoId(null)
+    setEditingCaption('')
+  }, [])
+
+  const handleSaveCaption = useCallback(
+    async (photoId: string) => {
+      if (!editingCaption.trim()) {
+        toast.warning('El nombre no puede estar vacío')
+        return
       }
 
-      // ✅ PLAN C: Éxito con toast profesional
-      if (newPhotos.length > 0) {
-        setPhotos([...photos, ...newPhotos]);
-        toast.success(`${newPhotos.length} foto(s) subida(s) exitosamente`, {
-          duration: 3000
-        });
+      try {
+        await supabase
+          .from('property_images')
+          .update({ caption: editingCaption.trim() })
+          .eq('id', photoId)
+
+        setPhotos(
+          photos.map(photo =>
+            photo.id === photoId ? { ...photo, caption: editingCaption.trim() } : photo
+          )
+        )
+
+        setEditingPhotoId(null)
+        setEditingCaption('')
+
+        toast.success('Nombre actualizado correctamente')
+      } catch (error) {
+        logger.error('Error al actualizar nombre:', error)
+        toast.error('Error al actualizar el nombre')
       }
+    },
+    [editingCaption, photos, toast]
+  )
 
-    } catch (error) {
-      // ✅ PLAN C: Error general con toast
-      logger.error('Error al subir fotos:', error);
-      toast.error('Error al subir las fotos. Intenta nuevamente', {
-        duration: 5000
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  };
+  const volverCatalogo = useCallback(() => {
+    router.push('/dashboard/catalogo')
+  }, [router])
 
-  // ✅ PLAN C: Establecer portada con toast
-  const handleSetCover = async (photoId: string) => {
-    try {
-      // Quitar portada de todas las fotos
-      await supabase
-        .from('property_images')
-        .update({ is_cover: false })
-        .eq('property_id', propertyId);
-
-      // Establecer nueva portada
-      await supabase
-        .from('property_images')
-        .update({ is_cover: true })
-        .eq('id', photoId);
-
-      // Actualizar estado local
-      setPhotos(photos.map(photo => ({
-        ...photo,
-        is_cover: photo.id === photoId
-      })));
-
-      toast.success('Foto de portada actualizada', {
-        duration: 3000
-      });
-
-    } catch (error) {
-      logger.error('Error al establecer portada:', error);
-      toast.error('Error al establecer la foto de portada', {
-        duration: 4000
-      });
-    }
-  };
-
-  // ✅ PLAN C: Eliminar con confirmación profesional
-  const handleDelete = async (photoId: string) => {
-    const confirmed = await confirm.danger(
-      '¿Eliminar esta foto?',
-      'Esta acción no se puede deshacer'
-    );
-    
-    if (!confirmed) return;
-
-    try {
-      await supabase
-        .from('property_images')
-        .delete()
-        .eq('id', photoId);
-
-      setPhotos(photos.filter(p => p.id !== photoId));
-      
-      toast.success('Foto eliminada correctamente', {
-        duration: 3000
-      });
-
-    } catch (error) {
-      logger.error('Error al eliminar foto:', error);
-      toast.error('Error al eliminar la foto', {
-        duration: 4000
-      });
-    }
-  };
-
-  // ✅ PLAN C: Asignar espacio con toast
-  const handleAssignSpace = async (photoId: string, spaceType: string) => {
-    try {
-      await supabase
-        .from('property_images')
-        .update({ space_type: spaceType })
-        .eq('id', photoId);
-
-      setPhotos(photos.map(photo => 
-        photo.id === photoId 
-          ? { ...photo, space_type: spaceType }
-          : photo
-      ));
-
-      const espacioNombre = property?.espacios?.find(e => e.id === spaceType)?.name || spaceType;
-      
-      toast.success(`Foto asignada a: ${espacioNombre}`, {
-        duration: 3000
-      });
-
-    } catch (error) {
-      logger.error('Error al asignar espacio:', error);
-      toast.error('Error al asignar espacio', {
-        duration: 4000
-      });
-    }
-  };
-
-  const handleStartEdit = (photo: PropertyImage) => {
-    setEditingPhotoId(photo.id);
-    setEditingCaption(photo.caption || '');
-  };
-
-  const handleCancelEdit = () => {
-    setEditingPhotoId(null);
-    setEditingCaption('');
-  };
-
-  // ✅ PLAN C: Guardar caption con validación y toast
-  const handleSaveCaption = async (photoId: string) => {
-    // Validación
-    if (!editingCaption.trim()) {
-      toast.warning('El nombre no puede estar vacío', {
-        duration: 3000
-      });
-      return;
-    }
-
-    try {
-      await supabase
-        .from('property_images')
-        .update({ caption: editingCaption.trim() })
-        .eq('id', photoId);
-
-      setPhotos(photos.map(photo =>
-        photo.id === photoId
-          ? { ...photo, caption: editingCaption.trim() }
-          : photo
-      ));
-
-      setEditingPhotoId(null);
-      setEditingCaption('');
-
-      toast.success('Nombre actualizado correctamente', {
-        duration: 3000
-      });
-
-    } catch (error) {
-      logger.error('Error al actualizar nombre:', error);
-      toast.error('Error al actualizar el nombre', {
-        duration: 4000
-      });
-    }
-  };
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }, [router])
 
   // Filtrado de fotos
   const filteredPhotos = photos.filter(photo => {
-    const matchesSpace = selectedSpace === 'all' || photo.space_type === selectedSpace;
-    const matchesSearch = photo.caption?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false;
-    return matchesSpace && (searchQuery === '' || matchesSearch);
-  });
+    const matchesSpace = selectedSpace === 'all' || photo.space_type === selectedSpace
+    const matchesSearch =
+      photo.caption?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false
+    return matchesSpace && (searchQuery === '' || matchesSearch)
+  })
 
-  if (loading) {
-    return <Loading fullScreen />;
+  if (authLoading || loading) {
+    return <Loading message="Cargando galería..." />
   }
 
   return (
@@ -390,42 +357,15 @@ export default function GaleriaPage() {
       <TopBar
         title={`Galería - ${property?.nombre_propiedad || 'Propiedad'}`}
         showBackButton={true}
+        onBackClick={volverCatalogo}
         showUserInfo={true}
         userEmail={user?.email}
         onLogout={handleLogout}
       />
 
       <main className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
-        {/* Header con botón subir fotos */}
+        {/* Filtros */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800 font-poppins">
-                📸 Galería de Fotos
-              </h2>
-              <p className="text-gray-600 mt-1">
-                {photos.length} {photos.length === 1 ? 'foto' : 'fotos'}
-              </p>
-            </div>
-
-            {photos.length > 0 && (
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handleFileSelect}
-                  disabled={isUploading}
-                  className="hidden"
-                />
-                <div className="px-6 py-3 bg-gradient-to-r from-ras-azul to-ras-turquesa text-white rounded-xl font-semibold hover:shadow-xl transition-all hover:scale-105 active:scale-95">
-                  {isUploading ? '⏳ Subiendo...' : '📸 Subir Fotos'}
-                </div>
-              </label>
-            )}
-          </div>
-
-          {/* Filtros */}
           <div className="flex flex-col md:flex-row gap-4">
             {/* Buscador */}
             <div className="flex-1">
@@ -461,21 +401,61 @@ export default function GaleriaPage() {
                 <polyline points="6 9 12 15 18 9"/>
               </svg>
             </div>
+
+            {/* Botón subir fotos */}
+            {photos.length > 0 && (
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  disabled={isUploading}
+                  className="hidden"
+                />
+                <div className="px-6 py-2 bg-gradient-to-r from-ras-azul to-ras-turquesa text-white rounded-lg font-semibold hover:shadow-lg transition-all hover:scale-105 active:scale-95 whitespace-nowrap">
+                  {isUploading ? '⏳ Subiendo...' : '📸 Subir'}
+                </div>
+              </label>
+            )}
           </div>
         </div>
 
         {/* Grid de fotos */}
         {filteredPhotos.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredPhotos.map((photo) => (
-              <div key={photo.id} className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all">
+            {filteredPhotos.map((photo, index) => (
+              <div
+                key={photo.id}
+                className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all"
+              >
                 {/* Imagen con dropdown y badge */}
-                <div className="relative aspect-square">
+                <div className="relative aspect-square group">
                   <img
                     src={photo.url}
                     alt={photo.caption || 'Foto'}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-105"
+                    onClick={() => openLightbox(index)}
                   />
+
+                  {/* Overlay para indicar que es clickeable */}
+                  <div
+                    className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer"
+                    onClick={() => openLightbox(index)}
+                  >
+                    <svg
+                      className="w-12 h-12 text-white"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <circle cx="11" cy="11" r="8" />
+                      <path d="m21 21-4.35-4.35" />
+                      <line x1="11" y1="8" x2="11" y2="14" />
+                      <line x1="8" y1="11" x2="14" y2="11" />
+                    </svg>
+                  </div>
                   
                   {/* Badge de portada */}
                   {photo.is_cover && (
@@ -609,6 +589,74 @@ export default function GaleriaPage() {
           />
         )}
       </main>
+
+      {/* Lightbox */}
+      {lightboxOpen && filteredPhotos.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
+          onClick={closeLightbox}
+        >
+          {/* Botón cerrar */}
+          <button
+            onClick={closeLightbox}
+            className="absolute top-4 right-4 z-50 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center text-white"
+          >
+            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+
+          {/* Botón anterior */}
+          {filteredPhotos.length > 1 && (
+            <button
+              onClick={e => {
+                e.stopPropagation()
+                prevImage()
+              }}
+              className="absolute left-4 z-50 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center text-white"
+            >
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          )}
+
+          {/* Botón siguiente */}
+          {filteredPhotos.length > 1 && (
+            <button
+              onClick={e => {
+                e.stopPropagation()
+                nextImage()
+              }}
+              className="absolute right-4 z-50 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center text-white"
+            >
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          )}
+
+          {/* Imagen */}
+          <div className="relative max-w-7xl max-h-screen w-full h-full flex flex-col" onClick={e => e.stopPropagation()}>
+            <img
+              src={filteredPhotos[lightboxIndex]?.url}
+              alt={filteredPhotos[lightboxIndex]?.caption || 'Foto'}
+              className="w-full h-full object-contain"
+            />
+
+            {/* Info de la imagen */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
+              <p className="text-white text-lg font-semibold mb-1">
+                {filteredPhotos[lightboxIndex]?.caption}
+              </p>
+              <p className="text-white/60 text-sm">
+                {lightboxIndex + 1} / {filteredPhotos.length}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  );
+  )
 }

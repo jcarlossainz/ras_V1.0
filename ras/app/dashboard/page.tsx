@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { logger } from '@/lib/logger'
-import { useToast } from '@/hooks/useToast'
-import { useConfirm } from '@/components/ui/confirm-modal'
+import { useAuth } from '@/hooks/useAuth'
+import { useLogout } from '@/hooks/useLogout'
 import TopBar from '@/components/ui/topbar'
 import Card from '@/components/ui/card'
 import Loading from '@/components/ui/loading'
@@ -36,44 +36,11 @@ interface DashboardMetrics {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const toast = useToast()
-  const confirm = useConfirm()
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, profile, loading, isAuthenticated } = useAuth()
+  const { logout, isLoggingOut } = useLogout()
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
 
-  useEffect(() => {
-    checkUser()
-  }, [])
-
-  const checkUser = async () => {
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      
-      if (!authUser) {
-        router.push('/login')
-        return
-      }
-
-      setUser(authUser)
-
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single()
-
-      setProfile(profileData)
-      await cargarMetricas(authUser.id)
-      setLoading(false)
-    } catch (error) {
-      logger.error('Error en checkUser:', error)
-      router.push('/login')
-    }
-  }
-
-  const cargarMetricas = async (userId: string) => {
+  const cargarMetricas = useCallback(async (userId: string) => {
     try {
       // Obtener propiedades del usuario
       const { data: propsPropias } = await supabase
@@ -167,33 +134,22 @@ export default function DashboardPage() {
     } catch (error) {
       logger.error('Error cargando métricas:', error)
     }
-  }
+  }, []) // No dependencies needed - function uses only parameters
 
-  const handleLogout = async () => {
-    const confirmed = await confirm.warning(
-      '¿Estás seguro que deseas cerrar sesión?',
-      'Se cerrará tu sesión actual'
-    )
-    
-    if (!confirmed) return
-
-    try {
-      await supabase.auth.signOut()
-      toast.success('Sesión cerrada correctamente')
-      router.push('/login')
-    } catch (error: any) {
-      logger.error('Error al cerrar sesión:', error)
-      toast.error('Error al cerrar sesión')
+  // Cargar métricas cuando el usuario está autenticado
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      cargarMetricas(user.id)
     }
-  }
+  }, [isAuthenticated, user, cargarMetricas])
 
-  const formatearFecha = (fecha: string | null) => {
+  const formatearFecha = useCallback((fecha: string | null) => {
     if (!fecha) return 'N/A'
     return new Date(fecha).toLocaleDateString('es-MX', {
       day: 'numeric',
       month: 'short'
     })
-  }
+  }, [])
 
   if (loading) {
     return <Loading message="Cargando dashboard..." />
@@ -201,12 +157,12 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema">
-      <TopBar 
+      <TopBar
         title="Inicio"
         showAddButton={false}
         showUserInfo={true}
         userEmail={user?.email}
-        onLogout={handleLogout}
+        onLogout={logout}
       />
 
       {/* Main Content */}
@@ -230,13 +186,13 @@ export default function DashboardPage() {
           />
 
           {/* MARKET */}
-          <Card 
+          <Card
             title="Market"
             onClick={() => router.push('/dashboard/market')}
             icon={
               <div className="w-24 h-24 rounded-xl bg-gradient-to-b from-ras-crema to-white border-2 border-ras-crema/50 flex items-center justify-center">
-                <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2a2 2 0 0 1 2 2v1.5a7 7 0 0 1 4.5 6.196V15a3 3 0 0 0 1.5 2.598v.902H4v-.902A3 3 0 0 0 5.5 15v-3.304A7 7 0 0 1 10 5.5V4a2 2 0 0 1 2-2z" fill="#fbbf24" stroke="currentColor" strokeWidth="1.6"/>
+                <svg className="w-12 h-12 text-module-market" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2a2 2 0 0 1 2 2v1.5a7 7 0 0 1 4.5 6.196V15a3 3 0 0 0 1.5 2.598v.902H4v-.902A3 3 0 0 0 5.5 15v-3.304A7 7 0 0 1 10 5.5V4a2 2 0 0 1 2-2z" fill="currentColor" stroke="currentColor" strokeWidth="1.6"/>
                   <path d="M9 19a3 3 0 0 0 6 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
                 </svg>
               </div>
@@ -244,13 +200,13 @@ export default function DashboardPage() {
           />
 
           {/* TICKETS */}
-          <Card 
+          <Card
             title="Tickets"
             onClick={() => router.push('/dashboard/tickets')}
             icon={
               <div className="w-24 h-24 rounded-xl bg-gradient-to-b from-ras-crema to-white border-2 border-ras-crema/50 flex items-center justify-center">
-                <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none">
-                  <rect x="2" y="3" width="20" height="18" rx="2" fill="#fb8500" stroke="currentColor" strokeWidth="1.6"/>
+                <svg className="w-12 h-12 text-module-tickets" viewBox="0 0 24 24" fill="none">
+                  <rect x="2" y="3" width="20" height="18" rx="2" fill="currentColor" stroke="currentColor" strokeWidth="1.6"/>
                   <path d="M2 8h20M7 12h7M7 16h4" stroke="white" strokeWidth="1.6" strokeLinecap="round"/>
                 </svg>
               </div>
@@ -258,13 +214,13 @@ export default function DashboardPage() {
           />
 
           {/* CALENDARIO */}
-          <Card 
+          <Card
             title="Calendario"
             onClick={() => router.push('/dashboard/calendario')}
             icon={
               <div className="w-24 h-24 rounded-xl bg-gradient-to-b from-ras-crema to-white border-2 border-ras-crema/50 flex items-center justify-center">
-                <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none">
-                  <rect x="3" y="4" width="18" height="18" rx="2" fill="#5f7c8a" stroke="currentColor" strokeWidth="1.6"/>
+                <svg className="w-12 h-12 text-module-calendario" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="4" width="18" height="18" rx="2" fill="currentColor" stroke="currentColor" strokeWidth="1.6"/>
                   <path d="M3 10h18M8 2v4M16 2v4" stroke="white" strokeWidth="1.6" strokeLinecap="round"/>
                   <circle cx="8" cy="15" r="1" fill="white"/>
                   <circle cx="12" cy="15" r="1" fill="white"/>
@@ -275,13 +231,13 @@ export default function DashboardPage() {
           />
 
           {/* CUENTAS */}
-          <Card 
+          <Card
             title="Cuentas"
             onClick={() => router.push('/dashboard/cuentas')}
             icon={
               <div className="w-24 h-24 rounded-xl bg-gradient-to-b from-ras-crema to-white border-2 border-ras-crema/50 flex items-center justify-center">
-                <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none">
-                  <rect x="3" y="6" width="18" height="12" rx="2" fill="#6b8e23" stroke="currentColor" strokeWidth="1.6"/>
+                <svg className="w-12 h-12 text-module-cuentas" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="6" width="18" height="12" rx="2" fill="currentColor" stroke="currentColor" strokeWidth="1.6"/>
                   <circle cx="12" cy="12" r="3" stroke="white" strokeWidth="1.6"/>
                 </svg>
               </div>
@@ -289,13 +245,13 @@ export default function DashboardPage() {
           />
 
           {/* DIRECTORIO */}
-          <Card 
+          <Card
             title="Directorio"
             onClick={() => router.push('/dashboard/directorio')}
             icon={
               <div className="w-24 h-24 rounded-xl bg-gradient-to-b from-ras-crema to-white border-2 border-ras-crema/50 flex items-center justify-center">
-                <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none">
-                  <rect x="4" y="3" width="14" height="18" rx="2" fill="#c1666b" stroke="currentColor" strokeWidth="1.6"/>
+                <svg className="w-12 h-12 text-module-directorio" viewBox="0 0 24 24" fill="none">
+                  <rect x="4" y="3" width="14" height="18" rx="2" fill="currentColor" stroke="currentColor" strokeWidth="1.6"/>
                   <path d="M19 7h2M19 12h2M19 17h2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
                   <circle cx="11" cy="9" r="2" stroke="white" strokeWidth="1.4" fill="none"/>
                   <path d="M8 16a3 3 0 0 1 6 0" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
@@ -308,82 +264,82 @@ export default function DashboardPage() {
           <div className="lg:col-span-3">
             <div className="bg-white rounded-2xl shadow-xl border-2 border-gray-200 p-6">
               {/* Título estilo Card */}
-              <h2 className="text-lg font-bold text-gray-800 mb-6 text-center">Dashboard</h2>
+              <h2 className="text-lg font-bold font-poppins text-gray-800 mb-6 text-center">Dashboard</h2>
 
               {metrics ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   
                   {/* TICKETS - Vencidos (naranja) */}
-                  <div 
+                  <div
                     onClick={() => router.push('/dashboard/tickets')}
-                    className="bg-white rounded-xl p-4 border-2 border-[#fb8500]/20 hover:border-[#fb8500]/40 hover:shadow-lg transition-all cursor-pointer"
+                    className="bg-white rounded-xl p-4 border-2 border-module-tickets/20 hover:border-module-tickets/40 hover:shadow-lg transition-all cursor-pointer"
                   >
-                    <div className="text-xs font-semibold mb-2 text-[#fb8500]">Vencidos</div>
-                    <div className="text-4xl font-bold mb-1 text-[#fb8500]">{metrics.tickets.vencidos}</div>
+                    <div className="text-xs font-semibold font-poppins mb-2 text-module-tickets">Vencidos</div>
+                    <div className="text-4xl font-bold mb-1 text-module-tickets">{metrics.tickets.vencidos}</div>
                     <div className="text-xs text-gray-500">Pagos atrasados</div>
                   </div>
 
                   {/* TICKETS - Hoy (naranja) */}
-                  <div 
+                  <div
                     onClick={() => router.push('/dashboard/tickets')}
-                    className="bg-white rounded-xl p-4 border-2 border-[#fb8500]/20 hover:border-[#fb8500]/40 hover:shadow-lg transition-all cursor-pointer"
+                    className="bg-white rounded-xl p-4 border-2 border-module-tickets/20 hover:border-module-tickets/40 hover:shadow-lg transition-all cursor-pointer"
                   >
-                    <div className="text-xs font-semibold mb-2 text-[#fb8500]">Vencen Hoy</div>
-                    <div className="text-4xl font-bold mb-1 text-[#fb8500]">{metrics.tickets.hoy}</div>
+                    <div className="text-xs font-semibold font-poppins mb-2 text-module-tickets">Vencen Hoy</div>
+                    <div className="text-4xl font-bold mb-1 text-module-tickets">{metrics.tickets.hoy}</div>
                     <div className="text-xs text-gray-500">Pagos de hoy</div>
                   </div>
 
                   {/* TICKETS - Esta semana (naranja) */}
-                  <div 
+                  <div
                     onClick={() => router.push('/dashboard/tickets')}
-                    className="bg-white rounded-xl p-4 border-2 border-[#fb8500]/20 hover:border-[#fb8500]/40 hover:shadow-lg transition-all cursor-pointer"
+                    className="bg-white rounded-xl p-4 border-2 border-module-tickets/20 hover:border-module-tickets/40 hover:shadow-lg transition-all cursor-pointer"
                   >
-                    <div className="text-xs font-semibold mb-2 text-[#fb8500]">Esta Semana</div>
-                    <div className="text-4xl font-bold mb-1 text-[#fb8500]">{metrics.tickets.proximos}</div>
+                    <div className="text-xs font-semibold font-poppins mb-2 text-module-tickets">Esta Semana</div>
+                    <div className="text-4xl font-bold mb-1 text-module-tickets">{metrics.tickets.proximos}</div>
                     <div className="text-xs text-gray-500">Próximos 7 días</div>
                   </div>
 
                   {/* TICKETS - Total Pendiente (naranja) */}
-                  <div 
+                  <div
                     onClick={() => router.push('/dashboard/tickets')}
-                    className="bg-white rounded-xl p-4 border-2 border-[#fb8500]/20 hover:border-[#fb8500]/40 hover:shadow-lg transition-all cursor-pointer"
+                    className="bg-white rounded-xl p-4 border-2 border-module-tickets/20 hover:border-module-tickets/40 hover:shadow-lg transition-all cursor-pointer"
                   >
-                    <div className="text-xs font-semibold mb-2 text-[#fb8500]">Por Pagar</div>
-                    <div className="text-3xl font-bold mb-1 text-[#fb8500]">
+                    <div className="text-xs font-semibold font-poppins mb-2 text-module-tickets">Por Pagar</div>
+                    <div className="text-3xl font-bold mb-1 text-module-tickets">
                       ${(metrics.tickets.montoTotal / 1000).toFixed(1)}K
                     </div>
                     <div className="text-xs text-gray-500">Monto total</div>
                   </div>
 
                   {/* ANUNCIOS - Activos (amarillo) */}
-                  <div 
+                  <div
                     onClick={() => router.push('/dashboard/market')}
-                    className="bg-white rounded-xl p-4 border-2 border-[#fbbf24]/20 hover:border-[#fbbf24]/40 hover:shadow-lg transition-all cursor-pointer"
+                    className="bg-white rounded-xl p-4 border-2 border-module-market/20 hover:border-module-market/40 hover:shadow-lg transition-all cursor-pointer"
                   >
-                    <div className="text-xs font-semibold mb-2 text-[#fbbf24]">Activos</div>
-                    <div className="text-4xl font-bold mb-1 text-[#fbbf24]">{metrics.anuncios.activos}</div>
+                    <div className="text-xs font-semibold font-poppins mb-2 text-module-market">Activos</div>
+                    <div className="text-4xl font-bold mb-1 text-module-market">{metrics.anuncios.activos}</div>
                     <div className="text-xs text-gray-500">Anuncios</div>
                   </div>
 
                   {/* ANUNCIOS - Pausados (amarillo) */}
-                  <div 
+                  <div
                     onClick={() => router.push('/dashboard/market')}
-                    className="bg-white rounded-xl p-4 border-2 border-[#fbbf24]/20 hover:border-[#fbbf24]/40 hover:shadow-lg transition-all cursor-pointer"
+                    className="bg-white rounded-xl p-4 border-2 border-module-market/20 hover:border-module-market/40 hover:shadow-lg transition-all cursor-pointer"
                   >
-                    <div className="text-xs font-semibold mb-2 text-[#fbbf24]">Pausados</div>
-                    <div className="text-4xl font-bold mb-1 text-[#fbbf24]">{metrics.anuncios.pausados}</div>
+                    <div className="text-xs font-semibold font-poppins mb-2 text-module-market">Pausados</div>
+                    <div className="text-4xl font-bold mb-1 text-module-market">{metrics.anuncios.pausados}</div>
                     <div className="text-xs text-gray-500">Anuncios</div>
                   </div>
 
                   {/* CALENDARIO - Próximo Pago (azul calendario) */}
-                  <div 
+                  <div
                     onClick={() => router.push('/dashboard/calendario')}
-                    className="bg-white rounded-xl p-4 border-2 border-[#5f7c8a]/20 hover:border-[#5f7c8a]/40 hover:shadow-lg transition-all cursor-pointer"
+                    className="bg-white rounded-xl p-4 border-2 border-module-calendario/20 hover:border-module-calendario/40 hover:shadow-lg transition-all cursor-pointer"
                   >
-                    <div className="text-xs font-semibold mb-2 text-[#5f7c8a]">Próximo Pago</div>
+                    <div className="text-xs font-semibold font-poppins mb-2 text-module-calendario">Próximo Pago</div>
                     {metrics.calendario.proximoPago ? (
                       <>
-                        <div className="text-2xl font-bold mb-1 text-[#5f7c8a]">
+                        <div className="text-2xl font-bold mb-1 text-module-calendario">
                           {formatearFecha(metrics.calendario.proximoPago.fecha)}
                         </div>
                         <div className="text-xs text-gray-500 truncate">
@@ -396,12 +352,12 @@ export default function DashboardPage() {
                   </div>
 
                   {/* CUENTAS - Propiedades (verde cuentas) */}
-                  <div 
+                  <div
                     onClick={() => router.push('/dashboard/cuentas')}
-                    className="bg-white rounded-xl p-4 border-2 border-[#6b8e23]/20 hover:border-[#6b8e23]/40 hover:shadow-lg transition-all cursor-pointer"
+                    className="bg-white rounded-xl p-4 border-2 border-module-cuentas/20 hover:border-module-cuentas/40 hover:shadow-lg transition-all cursor-pointer"
                   >
-                    <div className="text-xs font-semibold mb-2 text-[#6b8e23]">Propiedades</div>
-                    <div className="text-4xl font-bold mb-1 text-[#6b8e23]">{metrics.cuentas.propiedades}</div>
+                    <div className="text-xs font-semibold font-poppins mb-2 text-module-cuentas">Propiedades</div>
+                    <div className="text-4xl font-bold mb-1 text-module-cuentas">{metrics.cuentas.propiedades}</div>
                     <div className="text-xs text-gray-500">Total</div>
                   </div>
 

@@ -1,13 +1,13 @@
 'use client'
 
 /**
- * CUENTAS - Vista Consolidada
- * Muestra resumen financiero y tabla de movimientos (egresos e ingresos)
- * Diseño alineado con Calendario y Tickets RAS
+ * BALANCE/CUENTAS POR PROPIEDAD - Vista Individual
+ * Muestra resumen financiero y movimientos de UNA propiedad específica
+ * Diseño alineado con /dashboard/cuentas (global)
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/useToast'
 import { useAuth } from '@/hooks/useAuth'
@@ -26,20 +26,29 @@ interface Movimiento {
   propiedad_id: string
 }
 
-export default function CuentasGlobalPage() {
-  const router = useRouter()
-  const toast = useToast()
-  const { user, profile, loading, isAuthenticated } = useAuth()
+interface Propiedad {
+  id: string
+  nombre: string
+  tipo_propiedad?: string
+}
 
+export default function BalancePropiedadPage() {
+  const router = useRouter()
+  const params = useParams()
+  const toast = useToast()
+  const { user, loading: authLoading, isAuthenticated } = useAuth()
+
+  const propiedadId = params?.id as string
+
+  const [loading, setLoading] = useState(true)
+  const [propiedad, setPropiedad] = useState<Propiedad | null>(null)
   const [movimientos, setMovimientos] = useState<Movimiento[]>([])
   const [movimientosFiltrados, setMovimientosFiltrados] = useState<Movimiento[]>([])
-  const [propiedades, setPropiedades] = useState<{ id: string; nombre: string }[]>([])
 
   // Filtros
   const [busqueda, setBusqueda] = useState('')
-  const [propiedadFiltroTabla, setPropiedadFiltroTabla] = useState<string>('todas')
   const [tipoFiltroTabla, setTipoFiltroTabla] = useState<string>('todos')
-  const [ordenFecha, setOrdenFecha] = useState<'asc' | 'desc'>('asc') // asc = más antigua primero (por defecto)
+  const [ordenFecha, setOrdenFecha] = useState<'asc' | 'desc'>('asc')
 
   // Filtro de fechas para la TABLA (default = mes actual)
   const primerDiaMes = new Date()
@@ -50,17 +59,10 @@ export default function CuentasGlobalPage() {
   const [fechaHastaTabla, setFechaHastaTabla] = useState(new Date().toISOString().split('T')[0])
 
   // Dropdowns en headers de tabla
-  const [showPropiedadDropdownTabla, setShowPropiedadDropdownTabla] = useState(false)
   const [showTipoDropdownTabla, setShowTipoDropdownTabla] = useState(false)
   const [showFechaDropdownTabla, setShowFechaDropdownTabla] = useState(false)
   const [showTituloDropdownTabla, setShowTituloDropdownTabla] = useState(false)
   const [showResponsableDropdownTabla, setShowResponsableDropdownTabla] = useState(false)
-
-  // Filtros del comparativo (multi-select)
-  const [propietarioComparativo, setPropietarioComparativo] = useState<string[]>([])
-  const [propiedadComparativo, setPropiedadComparativo] = useState<string[]>([])
-  const [showPropietarioDropdown, setShowPropietarioDropdown] = useState(false)
-  const [showPropiedadDropdown, setShowPropiedadDropdown] = useState(false)
 
   // Filtro de rango de fechas personalizado (inicializado en el mes anterior por defecto)
   const mesAnteriorInicio = new Date()
@@ -68,48 +70,34 @@ export default function CuentasGlobalPage() {
   mesAnteriorInicio.setDate(1)
 
   const mesAnteriorFin = new Date()
-  mesAnteriorFin.setDate(0) // Último día del mes anterior
+  mesAnteriorFin.setDate(0)
 
   const [fechaDesde, setFechaDesde] = useState(mesAnteriorInicio.toISOString().split('T')[0])
   const [fechaHasta, setFechaHasta] = useState(mesAnteriorFin.toISOString().split('T')[0])
 
-  const cargarDatos = useCallback(async (userId: string) => {
+  const cargarDatos = useCallback(async () => {
+    if (!propiedadId) return
+
     try {
-      // Cargar propiedades
-      const { data: propsPropias } = await supabase
+      setLoading(true)
+
+      // Cargar propiedad
+      const { data: propData, error: propError } = await supabase
         .from('propiedades')
-        .select('id, nombre')
-        .eq('user_id', userId)
+        .select('id, nombre_propiedad, tipo_propiedad')
+        .eq('id', propiedadId)
+        .single()
 
-      const { data: propsCompartidas } = await supabase
-        .from('propiedades_colaboradores')
-        .select('propiedad_id')
-        .eq('user_id', userId)
-
-      let propsCompartidasData: any[] = []
-      if (propsCompartidas && propsCompartidas.length > 0) {
-        const ids = propsCompartidas.map(p => p.propiedad_id)
-        const { data } = await supabase
-          .from('propiedades')
-          .select('id, nombre')
-          .in('id', ids)
-        propsCompartidasData = data || []
-      }
-
-      const todasPropiedades = [
-        ...(propsPropias || []),
-        ...propsCompartidasData
-      ]
-
-      setPropiedades(todasPropiedades)
-
-      if (todasPropiedades.length === 0) {
-        setMovimientos([])
+      if (propError) {
+        console.error('Error cargando propiedad:', propError)
+        toast.error('No se pudo cargar la propiedad')
+        router.push('/dashboard/catalogo')
         return
       }
 
+      setPropiedad(propData)
+
       // Cargar EGRESOS (pagos CONCRETADOS/PAGADOS para estado de cuenta)
-      const propIds = todasPropiedades.map(p => p.id)
       const { data: pagos } = await supabase
         .from('fechas_pago_servicios')
         .select(`
@@ -122,26 +110,21 @@ export default function CuentasGlobalPage() {
             tipo_servicio
           )
         `)
-        .in('propiedad_id', propIds)
-        .eq('pagado', true) // CAMBIO CRÍTICO: Solo pagos concretados
-        .limit(500) // Aumentado para tener más histórico
+        .eq('propiedad_id', propiedadId)
+        .eq('pagado', true)
+        .limit(500)
 
       // Transformar pagos a movimientos (egresos)
-      const movimientosEgresos: Movimiento[] = (pagos || []).map(pago => {
-        const propiedad = todasPropiedades.find(p => p.id === pago.propiedad_id)
-        return {
-          id: pago.id,
-          propiedad_nombre: propiedad?.nombre || 'Sin nombre',
-          tipo: 'egreso' as const,
-          titulo: pago.servicios_inmueble.nombre,
-          monto: pago.monto_estimado,
-          responsable: 'Sistema',
-          fecha: pago.fecha_pago,
-          propiedad_id: pago.propiedad_id
-        }
-      })
-
-      console.log('📊 Movimientos CONCRETADOS cargados:', movimientosEgresos.length)
+      const movimientosEgresos: Movimiento[] = (pagos || []).map(pago => ({
+        id: pago.id,
+        propiedad_nombre: propData.nombre_propiedad,
+        tipo: 'egreso' as const,
+        titulo: pago.servicios_inmueble.nombre,
+        monto: pago.monto_estimado,
+        responsable: 'Sistema',
+        fecha: pago.fecha_pago,
+        propiedad_id: pago.propiedad_id
+      }))
 
       // TODO: Aquí agregarás los INGRESOS cuando estén en la BD
       const movimientosIngresos: Movimiento[] = []
@@ -151,9 +134,11 @@ export default function CuentasGlobalPage() {
 
     } catch (error) {
       console.error('Error cargando datos:', error)
-      toast.error('Error al cargar cuentas')
+      toast.error('Error al cargar balance')
+    } finally {
+      setLoading(false)
     }
-  }, [toast])
+  }, [propiedadId, toast, router])
 
   const aplicarFiltros = useCallback(() => {
     let filtrados = [...movimientos]
@@ -163,16 +148,11 @@ export default function CuentasGlobalPage() {
     fechaDesdeTObj.setHours(0, 0, 0, 0)
     const fechaHastaTObj = new Date(fechaHastaTabla)
     fechaHastaTObj.setHours(23, 59, 59, 999)
-    
+
     filtrados = filtrados.filter(m => {
       const fecha = new Date(m.fecha)
       return fecha >= fechaDesdeTObj && fecha <= fechaHastaTObj
     })
-
-    // Filtro por propiedad
-    if (propiedadFiltroTabla !== 'todas') {
-      filtrados = filtrados.filter(m => m.propiedad_id === propiedadFiltroTabla)
-    }
 
     // Filtro por tipo
     if (tipoFiltroTabla !== 'todos') {
@@ -183,7 +163,6 @@ export default function CuentasGlobalPage() {
     if (busqueda) {
       const searchLower = busqueda.toLowerCase()
       filtrados = filtrados.filter(m =>
-        m.propiedad_nombre.toLowerCase().includes(searchLower) ||
         m.titulo.toLowerCase().includes(searchLower) ||
         m.responsable.toLowerCase().includes(searchLower)
       )
@@ -191,40 +170,46 @@ export default function CuentasGlobalPage() {
 
     // Ordenar por fecha según el estado
     if (ordenFecha === 'desc') {
-      // Más reciente primero
       filtrados.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
     } else {
-      // Más antigua primero (por defecto)
       filtrados.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
     }
 
     setMovimientosFiltrados(filtrados)
-  }, [movimientos, propiedadFiltroTabla, tipoFiltroTabla, busqueda, ordenFecha, fechaDesdeTabla, fechaHastaTabla])
+  }, [movimientos, tipoFiltroTabla, busqueda, ordenFecha, fechaDesdeTabla, fechaHastaTabla])
 
-  // Cargar datos cuando el usuario está autenticado
   useEffect(() => {
     if (isAuthenticated && user) {
-      cargarDatos(user.id)
+      cargarDatos()
     }
-  }, [isAuthenticated, user, cargarDatos])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user, propiedadId])
 
   useEffect(() => {
-    if (movimientos.length > 0) {
+    if (movimientos.length >= 0) {
       aplicarFiltros()
     }
-  }, [movimientos, aplicarFiltros])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movimientos, tipoFiltroTabla, busqueda, ordenFecha, fechaDesdeTabla, fechaHastaTabla])
 
   const limpiarFiltros = useCallback(() => {
-    setPropiedadFiltroTabla('todas')
     setTipoFiltroTabla('todos')
     setBusqueda('')
-    // Resetear fechas al mes actual
     const primerDia = new Date()
     primerDia.setDate(1)
     primerDia.setHours(0, 0, 0, 0)
     setFechaDesdeTabla(primerDia.toISOString().split('T')[0])
     setFechaHastaTabla(new Date().toISOString().split('T')[0])
   }, [])
+
+  const volverCatalogo = useCallback(() => {
+    router.push('/dashboard/catalogo')
+  }, [router])
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }, [router])
 
   const formatearFecha = (fecha: string) => {
     return new Date(fecha).toLocaleDateString('es-MX', {
@@ -242,11 +227,10 @@ export default function CuentasGlobalPage() {
   }
 
   // Calcular estadísticas del mes actual
-  // IMPORTANTE: Usar movimientos SIN los filtros de la tabla
   const hoy = new Date()
   const mesActual = hoy.getMonth()
   const añoActual = hoy.getFullYear()
-  
+
   const movimientosMesActual = movimientos.filter(m => {
     const fecha = new Date(m.fecha)
     return fecha.getMonth() === mesActual && fecha.getFullYear() === añoActual
@@ -259,33 +243,14 @@ export default function CuentasGlobalPage() {
   }
   statsMesActual.balance = statsMesActual.totalIngresos - statsMesActual.totalEgresos
 
-  // Calcular estadísticas del rango personalizado (Del - Al)
-  // IMPORTANTE: Usar movimientos SIN los filtros de la tabla
+  // Calcular estadísticas del rango personalizado
   const fechaDesdeObj = new Date(fechaDesde)
   const fechaHastaObj = new Date(fechaHasta)
   fechaHastaObj.setHours(23, 59, 59, 999)
-  
+
   const movimientosRangoPersonalizado = movimientos.filter(m => {
     const fecha = new Date(m.fecha)
-    const dentroDelRango = fecha >= fechaDesdeObj && fecha <= fechaHastaObj
-    
-    // Aplicar filtro de propiedad si hay selección
-    if (propiedadComparativo.length > 0) {
-      return dentroDelRango && propiedadComparativo.includes(m.propiedad_id)
-    }
-    
-    return dentroDelRango
-  })
-
-  // Debug del comparativo
-  console.log('🔍 COMPARATIVO DEBUG:', {
-    fechaDesde,
-    fechaHasta,
-    totalMovimientos: movimientos.length,
-    movimientosEnRango: movimientosRangoPersonalizado.length,
-    propiedadComparativo,
-    primeraFecha: movimientos[0]?.fecha,
-    ultimaFecha: movimientos[movimientos.length - 1]?.fecha
+    return fecha >= fechaDesdeObj && fecha <= fechaHastaObj
   })
 
   const statsRangoPersonalizado = {
@@ -295,26 +260,24 @@ export default function CuentasGlobalPage() {
   }
   statsRangoPersonalizado.balance = statsRangoPersonalizado.totalIngresos - statsRangoPersonalizado.totalEgresos
 
-  const tiposOpciones = [
-    { id: 'egreso', label: 'Egresos' },
-    { id: 'ingreso', label: 'Ingresos' }
-  ]
-
-  if (loading) {
-    return <Loading message="Cargando cuentas..." />
+  if (loading || authLoading) {
+    return <Loading message="Cargando balance..." />
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-ras-crema via-white to-ras-crema">
       <TopBar
-        title="Cuentas"
+        title={`Balance - ${propiedad?.nombre_propiedad || 'Propiedad'}`}
         showBackButton
-        onBackClick={() => router.push('/dashboard')}
+        onBackClick={volverCatalogo}
+        showUserInfo={true}
+        userEmail={user?.email}
+        onLogout={handleLogout}
       />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        
-        {/* Filtro de Rango Personalizado - DEL AL + PROPIEDAD */}
+
+        {/* Filtro de Rango Personalizado - DEL AL */}
         <div className="mb-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-2">
             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide font-poppins">
@@ -335,102 +298,6 @@ export default function CuentasGlobalPage() {
                 onChange={(e) => setFechaHasta(e.target.value)}
                 className="px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ras-turquesa"
               />
-              
-              <span className="text-gray-400 mx-1">|</span>
-              
-              {/* Dropdown Propietario */}
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    setShowPropietarioDropdown(!showPropietarioDropdown)
-                    setShowPropiedadDropdown(false)
-                  }}
-                  className="px-3 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ras-turquesa bg-white hover:bg-gray-50 font-semibold text-gray-700 flex items-center gap-2"
-                >
-                  <span>Propietario {propietarioComparativo.length > 0 && `(${propietarioComparativo.length})`}</span>
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {showPropietarioDropdown && (
-                  <>
-                    <div 
-                      className="fixed inset-0 z-40" 
-                      onClick={() => setShowPropietarioDropdown(false)}
-                    />
-                    <div className="absolute z-50 mt-2 left-0 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[200px] max-h-60 overflow-y-auto">
-                      <label className="flex items-center px-4 py-2 hover:bg-ras-turquesa/5 cursor-pointer border-b border-gray-100">
-                        <input
-                          type="checkbox"
-                          checked={propietarioComparativo.length === 0}
-                          onChange={() => setPropietarioComparativo([])}
-                          className="w-4 h-4 text-ras-turquesa border-gray-300 rounded focus:ring-ras-turquesa"
-                        />
-                        <span className="ml-3 text-sm text-gray-700 font-semibold">Todos</span>
-                      </label>
-                      {/* TODO: Aquí irán los propietarios cuando estén disponibles en la BD */}
-                      <div className="px-4 py-3 text-xs text-gray-500 italic">
-                        Propietarios próximamente
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-              
-              {/* Dropdown Propiedad */}
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    setShowPropiedadDropdown(!showPropiedadDropdown)
-                    setShowPropietarioDropdown(false)
-                  }}
-                  className="px-3 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ras-turquesa bg-white hover:bg-gray-50 font-semibold text-gray-700 flex items-center gap-2"
-                >
-                  <span>Propiedad {propiedadComparativo.length > 0 && `(${propiedadComparativo.length})`}</span>
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {showPropiedadDropdown && (
-                  <>
-                    <div 
-                      className="fixed inset-0 z-40" 
-                      onClick={() => setShowPropiedadDropdown(false)}
-                    />
-                    <div className="absolute z-50 mt-2 left-0 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[200px] max-h-60 overflow-y-auto">
-                      <label className="flex items-center px-4 py-2 hover:bg-ras-turquesa/5 cursor-pointer border-b border-gray-100">
-                        <input
-                          type="checkbox"
-                          checked={propiedadComparativo.length === 0}
-                          onChange={() => setPropiedadComparativo([])}
-                          className="w-4 h-4 text-ras-turquesa border-gray-300 rounded focus:ring-ras-turquesa"
-                        />
-                        <span className="ml-3 text-sm text-gray-700 font-semibold">Todas</span>
-                      </label>
-                      {propiedades.map(prop => (
-                        <label
-                          key={prop.id}
-                          className="flex items-center px-4 py-2 hover:bg-ras-turquesa/5 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={propiedadComparativo.includes(prop.id)}
-                            onChange={() => {
-                              if (propiedadComparativo.includes(prop.id)) {
-                                setPropiedadComparativo(propiedadComparativo.filter(p => p !== prop.id))
-                              } else {
-                                setPropiedadComparativo([...propiedadComparativo, prop.id])
-                              }
-                            }}
-                            className="w-4 h-4 text-ras-turquesa border-gray-300 rounded focus:ring-ras-turquesa"
-                          />
-                          <span className="ml-3 text-sm text-gray-700">{prop.nombre}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -506,7 +373,7 @@ export default function CuentasGlobalPage() {
         {/* Filtros - Búsqueda + Fechas */}
         <div className="bg-white rounded-xl shadow-md p-4 mb-6 border border-gray-200">
           <div className="flex flex-col lg:flex-row gap-4">
-            
+
             {/* Filtro de Fechas */}
             <div className="flex items-center gap-3">
               <label className="text-xs font-semibold text-gray-600 font-poppins whitespace-nowrap">
@@ -533,13 +400,13 @@ export default function CuentasGlobalPage() {
                 type="text"
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Buscar propiedad, título, responsable..."
+                placeholder="Buscar por título, responsable..."
                 className="w-full py-2 px-3 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-ras-turquesa focus:border-transparent"
               />
             </div>
 
             {/* Botón limpiar filtros */}
-            {(propiedadFiltroTabla !== 'todas' || tipoFiltroTabla !== 'todos' || busqueda) && (
+            {(tipoFiltroTabla !== 'todos' || busqueda) && (
               <div className="flex items-center">
                 <button
                   onClick={limpiarFiltros}
@@ -556,7 +423,7 @@ export default function CuentasGlobalPage() {
           </div>
         </div>
 
-        {/* Tabla de Movimientos - IGUAL AL CALENDARIO */}
+        {/* Tabla de Movimientos */}
         {movimientosFiltrados.length > 0 ? (
           <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
@@ -571,7 +438,6 @@ export default function CuentasGlobalPage() {
                           onClick={() => {
                             setShowFechaDropdownTabla(!showFechaDropdownTabla)
                             setShowTipoDropdownTabla(false)
-                            setShowPropiedadDropdownTabla(false)
                             setShowTituloDropdownTabla(false)
                             setShowResponsableDropdownTabla(false)
                           }}
@@ -584,8 +450,8 @@ export default function CuentasGlobalPage() {
                       </div>
                       {showFechaDropdownTabla && (
                         <>
-                          <div 
-                            className="fixed inset-0 z-40" 
+                          <div
+                            className="fixed inset-0 z-40"
                             onClick={() => setShowFechaDropdownTabla(false)}
                           />
                           <div className="absolute z-50 mt-2 left-0 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[200px] p-3">
@@ -616,7 +482,7 @@ export default function CuentasGlobalPage() {
                         </>
                       )}
                     </th>
-                    
+
                     {/* Header TIPO con dropdown */}
                     <th className="px-6 py-3 text-left text-xs font-semibold font-poppins uppercase relative">
                       <div className="flex items-center gap-2">
@@ -624,7 +490,6 @@ export default function CuentasGlobalPage() {
                         <button
                           onClick={() => {
                             setShowTipoDropdownTabla(!showTipoDropdownTabla)
-                            setShowPropiedadDropdownTabla(false)
                             setShowFechaDropdownTabla(false)
                             setShowTituloDropdownTabla(false)
                             setShowResponsableDropdownTabla(false)
@@ -638,8 +503,8 @@ export default function CuentasGlobalPage() {
                       </div>
                       {showTipoDropdownTabla && (
                         <>
-                          <div 
-                            className="fixed inset-0 z-40" 
+                          <div
+                            className="fixed inset-0 z-40"
                             onClick={() => setShowTipoDropdownTabla(false)}
                           />
                           <div className="absolute z-50 mt-2 left-0 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[200px]">
@@ -680,170 +545,19 @@ export default function CuentasGlobalPage() {
                         </>
                       )}
                     </th>
-                    
-                    {/* Header TÍTULO con dropdown */}
-                    <th className="px-6 py-3 text-left text-xs font-semibold font-poppins uppercase relative">
-                      <div className="flex items-center gap-2">
-                        <span>Título</span>
-                        <button
-                          onClick={() => {
-                            setShowTituloDropdownTabla(!showTituloDropdownTabla)
-                            setShowTipoDropdownTabla(false)
-                            setShowPropiedadDropdownTabla(false)
-                            setShowFechaDropdownTabla(false)
-                            setShowResponsableDropdownTabla(false)
-                          }}
-                          className="hover:bg-white/20 rounded p-1 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                      </div>
-                      {showTituloDropdownTabla && (
-                        <>
-                          <div 
-                            className="fixed inset-0 z-40" 
-                            onClick={() => setShowTituloDropdownTabla(false)}
-                          />
-                          <div className="absolute z-50 mt-2 left-0 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[200px] p-3">
-                            <div className="text-sm text-gray-800 font-semibold mb-2">Ordenar por:</div>
-                            <button
-                              onClick={() => {
-                                // Implementar ordenamiento A-Z
-                                setShowTituloDropdownTabla(false)
-                              }}
-                              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-ras-turquesa/5 rounded transition-colors"
-                            >
-                              A → Z
-                            </button>
-                            <button
-                              onClick={() => {
-                                // Implementar ordenamiento Z-A
-                                setShowTituloDropdownTabla(false)
-                              }}
-                              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-ras-turquesa/5 rounded transition-colors"
-                            >
-                              Z → A
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </th>
-                    
-                    {/* Header PROPIEDAD con dropdown */}
-                    <th className="px-6 py-3 text-left text-xs font-semibold font-poppins uppercase relative">
-                      <div className="flex items-center gap-2">
-                        <span>Propiedad</span>
-                        <button
-                          onClick={() => {
-                            setShowPropiedadDropdownTabla(!showPropiedadDropdownTabla)
-                            setShowTipoDropdownTabla(false)
-                            setShowFechaDropdownTabla(false)
-                            setShowTituloDropdownTabla(false)
-                            setShowResponsableDropdownTabla(false)
-                          }}
-                          className="hover:bg-white/20 rounded p-1 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                      </div>
-                      {showPropiedadDropdownTabla && (
-                        <>
-                          <div 
-                            className="fixed inset-0 z-40" 
-                            onClick={() => setShowPropiedadDropdownTabla(false)}
-                          />
-                          <div className="absolute z-50 mt-2 left-0 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[250px] max-h-80 overflow-y-auto">
-                            <button
-                              onClick={() => {
-                                setPropiedadFiltroTabla('todas')
-                                setShowPropiedadDropdownTabla(false)
-                              }}
-                              className={`w-full text-left px-4 py-2 text-sm hover:bg-ras-turquesa/5 transition-colors border-b border-gray-100 ${
-                                propiedadFiltroTabla === 'todas' ? 'bg-ras-turquesa/10 font-semibold text-ras-azul' : 'text-gray-700'
-                              }`}
-                            >
-                              Todas las propiedades
-                            </button>
-                            {propiedades.map(prop => (
-                              <button
-                                key={prop.id}
-                                onClick={() => {
-                                  setPropiedadFiltroTabla(prop.id)
-                                  setShowPropiedadDropdownTabla(false)
-                                }}
-                                className={`w-full text-left px-4 py-2 text-sm hover:bg-ras-turquesa/5 transition-colors ${
-                                  propiedadFiltroTabla === prop.id ? 'bg-ras-turquesa/10 font-semibold text-ras-azul' : 'text-gray-700'
-                                }`}
-                              >
-                                {prop.nombre}
-                              </button>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </th>
-                    
-                    {/* Header RESPONSABLE con dropdown */}
-                    <th className="px-6 py-3 text-left text-xs font-semibold font-poppins uppercase relative">
-                      <div className="flex items-center gap-2">
-                        <span>Responsable</span>
-                        <button
-                          onClick={() => {
-                            setShowResponsableDropdownTabla(!showResponsableDropdownTabla)
-                            setShowTipoDropdownTabla(false)
-                            setShowPropiedadDropdownTabla(false)
-                            setShowFechaDropdownTabla(false)
-                            setShowTituloDropdownTabla(false)
-                          }}
-                          className="hover:bg-white/20 rounded p-1 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                      </div>
-                      {showResponsableDropdownTabla && (
-                        <>
-                          <div 
-                            className="fixed inset-0 z-40" 
-                            onClick={() => setShowResponsableDropdownTabla(false)}
-                          />
-                          <div className="absolute z-50 mt-2 left-0 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[200px] p-3">
-                            <div className="text-sm text-gray-800 font-semibold mb-2">Ordenar por:</div>
-                            <button
-                              onClick={() => {
-                                // Implementar ordenamiento A-Z
-                                setShowResponsableDropdownTabla(false)
-                              }}
-                              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-ras-turquesa/5 rounded transition-colors"
-                            >
-                              A → Z
-                            </button>
-                            <button
-                              onClick={() => {
-                                // Implementar ordenamiento Z-A
-                                setShowResponsableDropdownTabla(false)
-                              }}
-                              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-ras-turquesa/5 rounded transition-colors"
-                            >
-                              Z → A
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </th>
+
+                    {/* Header TÍTULO */}
+                    <th className="px-6 py-3 text-left text-xs font-semibold font-poppins uppercase">Título</th>
+
+                    {/* Header RESPONSABLE */}
+                    <th className="px-6 py-3 text-left text-xs font-semibold font-poppins uppercase">Responsable</th>
 
                     <th className="px-6 py-3 text-right text-xs font-semibold font-poppins uppercase">Monto</th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold font-poppins uppercase">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {movimientosFiltrados.map((mov) => (
-                    <tr 
+                    <tr
                       key={mov.id}
                       className="hover:bg-ras-turquesa/5 transition-colors"
                     >
@@ -869,41 +583,12 @@ export default function CuentasGlobalPage() {
                       <td className="px-6 py-4">
                         <div className="text-sm font-medium text-gray-900">{mov.titulo}</div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">{mov.propiedad_nombre}</div>
-                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-600">{mov.responsable}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className={`text-lg font-bold font-poppins ${mov.tipo === 'egreso' ? 'text-red-600' : 'text-green-600'}`}>
                           {mov.tipo === 'egreso' ? '-' : '+'}{formatearMonto(mov.monto)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => router.push(`/dashboard/propiedad/${mov.propiedad_id}/cuentas`)}
-                            className="p-2 hover:bg-ras-turquesa/10 rounded-lg transition-colors"
-                            title="Ver detalles"
-                          >
-                            <svg className="w-5 h-5 text-ras-azul" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => {
-                              // TODO: Implementar edición
-                              toast.info('Función de edición próximamente')
-                            }}
-                            className="p-2 hover:bg-ras-azul/10 rounded-lg transition-colors"
-                            title="Editar"
-                          >
-                            <svg className="w-5 h-5 text-ras-azul" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -949,7 +634,7 @@ export default function CuentasGlobalPage() {
               </svg>
             }
             title="No hay movimientos"
-            description={movimientos.length === 0 
+            description={movimientos.length === 0
               ? "Aún no tienes movimientos registrados"
               : "No se encontraron movimientos con los filtros aplicados"
             }

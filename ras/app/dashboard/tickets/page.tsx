@@ -6,11 +6,11 @@
  * Diseño alineado con Calendario RAS
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/useToast'
-import { useConfirm } from '@/components/ui/confirm-modal'
+import { useAuth } from '@/hooks/useAuth'
 import TopBar from '@/components/ui/topbar'
 import Loading from '@/components/ui/loading'
 import EmptyState from '@/components/ui/emptystate'
@@ -45,22 +45,20 @@ type EstadoUrgencia = 'vencido' | 'hoy' | 'proximo' | 'futuro'
 export default function TicketsGlobalPage() {
   const router = useRouter()
   const toast = useToast()
-  const confirm = useConfirm()
+  const { user, profile, loading, isAuthenticated } = useAuth()
 
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [ticketsFiltrados, setTicketsFiltrados] = useState<Ticket[]>([])
   const [propiedades, setPropiedades] = useState<Propiedad[]>([])
-  
+
   // Filtro de búsqueda
   const [busqueda, setBusqueda] = useState('')
-  
+
   // Filtro de fechas para la tabla (default = mes actual)
   const hoy = new Date()
   const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
   const ultimoDiaMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0)
-  
+
   const [fechaDesdeTabla, setFechaDesdeTabla] = useState(primerDiaMes.toISOString().split('T')[0])
   const [fechaHastaTabla, setFechaHastaTabla] = useState(ultimoDiaMes.toISOString().split('T')[0])
 
@@ -71,34 +69,15 @@ export default function TicketsGlobalPage() {
   // Modal de Nuevo Ticket
   const [showNuevoTicketModal, setShowNuevoTicketModal] = useState(false)
 
-  useEffect(() => {
-    checkUser()
+  const getDiasRestantes = useCallback((fechaProgramada: string) => {
+    const hoy = new Date()
+    hoy.setHours(0, 0, 0, 0)
+    const fecha = new Date(fechaProgramada + 'T00:00:00')
+    const diff = fecha.getTime() - hoy.getTime()
+    return Math.ceil(diff / (1000 * 60 * 60 * 24))
   }, [])
 
-  useEffect(() => {
-    if (tickets.length > 0) {
-      aplicarFiltros()
-    }
-  }, [tickets, busqueda, fechaDesdeTabla, fechaHastaTabla])
-
-  const checkUser = async () => {
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (!authUser) {
-      router.push('/login')
-      return
-    }
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', authUser.id)
-      .single()
-    
-    setUser({ ...profile, id: authUser.id })
-    await cargarDatos(authUser.id)
-    setLoading(false)
-  }
-
-  const cargarDatos = async (userId: string) => {
+  const cargarDatos = useCallback(async (userId: string) => {
     try {
       // Cargar todas las propiedades del usuario
       const { data: propsPropias } = await supabase
@@ -136,7 +115,7 @@ export default function TicketsGlobalPage() {
       const propIds = todasPropiedades.map(p => p.id)
       const { data: ticketsData, error: ticketsError } = await supabase
         .from('tickets')
-        .select('*')
+        .select('id, titulo, fecha_programada, monto_estimado, pagado, servicio_id, tipo_ticket, estado, prioridad, responsable, proveedor, propiedad_id')
         .in('propiedad_id', propIds)
         .eq('pagado', false)
         .order('fecha_programada', { ascending: true })
@@ -175,17 +154,9 @@ export default function TicketsGlobalPage() {
     } catch (error) {
       console.error('Error cargando datos:', error)
     }
-  }
+  }, [getDiasRestantes]) // Depends on getDiasRestantes
 
-  const getDiasRestantes = (fechaProgramada: string) => {
-    const hoy = new Date()
-    hoy.setHours(0, 0, 0, 0)
-    const fecha = new Date(fechaProgramada + 'T00:00:00')
-    const diff = fecha.getTime() - hoy.getTime()
-    return Math.ceil(diff / (1000 * 60 * 60 * 24))
-  }
-
-  const aplicarFiltros = () => {
+  const aplicarFiltros = useCallback(() => {
     let resultado = [...tickets]
 
     // Filtro de búsqueda
@@ -209,9 +180,22 @@ export default function TicketsGlobalPage() {
     })
 
     setTicketsFiltrados(resultado)
-  }
+  }, [tickets, busqueda, fechaDesdeTabla, fechaHastaTabla])
 
-  const getTipoIcon = (tipo: string) => {
+  // Cargar datos cuando el usuario está autenticado
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      cargarDatos(user.id)
+    }
+  }, [isAuthenticated, user, cargarDatos])
+
+  useEffect(() => {
+    if (tickets.length > 0) {
+      aplicarFiltros()
+    }
+  }, [tickets, aplicarFiltros])
+
+  const getTipoIcon = useCallback((tipo: string) => {
     const iconMap: Record<string, string> = {
       compra: '💵',
       mantenimiento: '🔧',
@@ -222,7 +206,7 @@ export default function TicketsGlobalPage() {
       otro: '📋'
     }
     return iconMap[tipo] || '📋'
-  }
+  }, [])
 
   const getEstadoBadge = (diasRestantes: number) => {
     if (diasRestantes < 0) {

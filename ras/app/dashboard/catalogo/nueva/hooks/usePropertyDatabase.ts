@@ -88,8 +88,8 @@ function transformFormToDatabase(formData: PropertyFormData): any {
     duracion_contrato_unidad: formData.duracion_contrato_unidad || null,
     frecuencia_pago: formData.frecuencia_pago || null,
     dia_pago: formData.dia_pago ? parseInt(formData.dia_pago) : null,
-    
-    // precio_renta_disponible: formData.precio_renta_disponible ? parseFloat(formData.precio_renta_disponible) : null,
+
+    precio_renta_disponible: formData.precio_renta_disponible ? parseFloat(formData.precio_renta_disponible) : null,
     requisitos_renta: formData.requisitos_renta || [],
     requisitos_renta_custom: formData.requisitos_renta_custom || [],
     

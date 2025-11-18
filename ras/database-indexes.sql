@@ -145,7 +145,7 @@ BEGIN
     IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'contactos') THEN
         CREATE INDEX IF NOT EXISTS idx_contactos_user_id ON contactos(user_id);
         CREATE INDEX IF NOT EXISTS idx_contactos_tipo ON contactos(tipo);
-        CREATE INDEX IF NOT EXISTS idx_contactos_nombre ON contactos(LOWER(full_name) text_pattern_ops);
+        CREATE INDEX IF NOT EXISTS idx_contactos_nombre ON contactos(LOWER(nombre) text_pattern_ops);
         RAISE NOTICE 'Índices para contactos creados exitosamente';
     ELSE
         RAISE NOTICE 'Tabla contactos no existe - índices omitidos';

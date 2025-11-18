@@ -12,13 +12,6 @@ import CompartirPropiedad from '@/components/CompartirPropiedad'
 import { getPropertyImages } from '@/lib/supabase/supabase-storage'
 import type { PropertyImage } from '@/types/property'
 
-interface Contacto {
-  id: string
-  nombre: string
-  telefono: string
-  email: string
-}
-
 interface Espacio {
   id: string
   name: string
@@ -52,37 +45,52 @@ interface Ubicacion {
 interface PropiedadData {
   id: string
   user_id: string
-  nombre: string
+  nombre_propiedad: string
   tipo_propiedad: string
   estados: string[]
   mobiliario: string
   capacidad_personas: number | null
   tamano_terreno: number | null
   tamano_construccion: number | null
-  
+
   // ✅ NUEVO: Ubicación como JSON
   ubicacion: Ubicacion | null
-  
+
   // ✅ NUEVO: Precios consolidados
   precios?: {
     mensual?: number | null
     noche?: number | null
     venta?: number | null
   }
-  
+
   // ✅ NUEVO: Datos condicionales
   datos_renta_largo_plazo?: any | null
   datos_renta_vacacional?: any | null
   datos_venta?: any | null
-  
+
   // Contactos (IDs)
   propietario_id: string | null
   supervisor_id: string | null
   inquilino_id: string | null
-  
+
+  // ✅ Emails directos (TEXT[])
+  propietarios_email?: string[] | null
+  supervisores_email?: string[] | null
+  inquilinos_email?: string[] | null
+
   // Espacios
   espacios: Espacio[] | null
-  
+
+  // ✅ Servicios (JSONB[])
+  servicios?: Array<{
+    id?: string
+    nombre: string
+    tipo_servicio?: string
+    proveedor?: string
+    costo?: number
+    frecuencia?: string
+  }> | null
+
   created_at: string
   updated_at: string
   es_propio: boolean
@@ -267,10 +275,6 @@ export default function HomePropiedad() {
   
   const [loading, setLoading] = useState(true)
   const [propiedad, setPropiedad] = useState<PropiedadData | null>(null)
-  const [propietario, setPropietario] = useState<Contacto | null>(null)
-  const [supervisor, setSupervisor] = useState<Contacto | null>(null)
-  const [inquilino, setInquilino] = useState<Contacto | null>(null)
-  const [proveedores, setProveedores] = useState<Contacto[]>([])
   const [user, setUser] = useState<any>(null)
   
   // Estados para modales
@@ -339,53 +343,6 @@ export default function HomePropiedad() {
       
       setPropiedad({ ...propData, es_propio: esPropio })
 
-      if (propData.propietario_id) {
-        const { data: propietarioData } = await supabase
-          .from('contactos')
-          .select('*')
-          .eq('id', propData.propietario_id)
-          .single()
-        setPropietario(propietarioData)
-      }
-
-      if (propData.supervisor_id) {
-        const { data: supervisorData } = await supabase
-          .from('contactos')
-          .select('*')
-          .eq('id', propData.supervisor_id)
-          .single()
-        setSupervisor(supervisorData)
-      }
-
-      if (propData.inquilino_id) {
-        const { data: inquilinoData } = await supabase
-          .from('contactos')
-          .select('*')
-          .eq('id', propData.inquilino_id)
-          .single()
-        setInquilino(inquilinoData)
-      }
-
-      // Cargar proveedores desde los servicios
-      const { data: servicios } = await supabase
-        .from('servicios_inmueble')
-        .select('proveedor_id')
-        .eq('propiedad_id', propiedadId)
-        .not('proveedor_id', 'is', null)
-
-      if (servicios && servicios.length > 0) {
-        const proveedorIds = [...new Set(servicios.map(s => s.proveedor_id).filter(Boolean))]
-        
-        if (proveedorIds.length > 0) {
-          const { data: proveedoresData } = await supabase
-            .from('contactos')
-            .select('*')
-            .in('id', proveedorIds)
-          
-          setProveedores(proveedoresData || [])
-        }
-      }
-
     } catch (error: any) {
       logger.error('Error al cargar propiedad:', error)
       toast.error('Error al cargar la propiedad')
@@ -437,7 +394,7 @@ export default function HomePropiedad() {
       const nuevaPropiedad = {
         ...propiedad,
         id: undefined,
-        nombre: nombreDuplicado,
+        nombre_propiedad: nombreDuplicado,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
@@ -464,7 +421,7 @@ export default function HomePropiedad() {
 
   const eliminarPropiedad = async () => {
     const confirmed = await confirm.danger(
-      `¿Eliminar "${propiedad?.nombre}"?`,
+      `¿Eliminar "${propiedad?.nombre_propiedad}"?`,
       'Esta acción NO se puede deshacer. Se eliminarán todos los datos, colaboradores, fotos, tickets y todo el historial.'
     )
 
@@ -509,7 +466,7 @@ export default function HomePropiedad() {
   return (
     <div className="min-h-screen bg-gray-50">
       <TopBar
-        title={propiedad.nombre}
+        title={propiedad.nombre_propiedad}
         showBackButton={true}
         showUserInfo={true}
         userEmail={user?.email}
@@ -790,6 +747,38 @@ export default function HomePropiedad() {
             </div>
           )}
 
+          {/* SECCIÓN: Servicios de la propiedad */}
+          {propiedad.servicios && propiedad.servicios.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border-2 border-gray-200 p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-teal-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 font-poppins">Servicios</h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {propiedad.servicios.map((servicio, idx) => (
+                  <div key={idx} className="p-4 bg-teal-50 rounded-lg border border-teal-200">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <span className="text-xs text-teal-600 font-semibold uppercase block mb-1">
+                          {servicio.tipo_servicio || 'Servicio'}
+                        </span>
+                        <p className="text-sm font-bold text-gray-900">{servicio.nombre}</p>
+                        {servicio.proveedor && (
+                          <p className="text-xs text-gray-600 mt-1">Proveedor: {servicio.proveedor}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* FILA: Asignaciones y Ubicación */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
@@ -806,70 +795,45 @@ export default function HomePropiedad() {
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 font-poppins">Asignaciones</h2>
               </div>
-              
+
               <div className="space-y-4">
-                {propietario && (
+                {/* Propietarios */}
+                {propiedad.propietarios_email && propiedad.propietarios_email.length > 0 && (
                   <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <span className="text-xs text-blue-600 font-semibold uppercase">Propietario</span>
-                    <p className="text-lg font-bold text-gray-900 mt-1">{propietario.nombre}</p>
-                    {propietario.telefono && (
-                      <p className="text-sm text-gray-600 mt-1">📱 {propietario.telefono}</p>
-                    )}
-                    {propietario.email && (
-                      <p className="text-sm text-gray-600">✉️ {propietario.email}</p>
-                    )}
-                  </div>
-                )}
-                
-                {supervisor && (
-                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                    <span className="text-xs text-green-600 font-semibold uppercase">Supervisor</span>
-                    <p className="text-lg font-bold text-gray-900 mt-1">{supervisor.nombre}</p>
-                    {supervisor.telefono && (
-                      <p className="text-sm text-gray-600 mt-1">📱 {supervisor.telefono}</p>
-                    )}
-                    {supervisor.email && (
-                      <p className="text-sm text-gray-600">✉️ {supervisor.email}</p>
-                    )}
-                  </div>
-                )}
-                
-                {inquilino && (
-                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                    <span className="text-xs text-amber-600 font-semibold uppercase">Inquilino</span>
-                    <p className="text-lg font-bold text-gray-900 mt-1">{inquilino.nombre}</p>
-                    {inquilino.telefono && (
-                      <p className="text-sm text-gray-600 mt-1">📱 {inquilino.telefono}</p>
-                    )}
-                    {inquilino.email && (
-                      <p className="text-sm text-gray-600">✉️ {inquilino.email}</p>
-                    )}
-                  </div>
-                )}
-                
-                {/* Proveedores */}
-                {proveedores.length > 0 && (
-                  <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                    <span className="text-xs text-purple-600 font-semibold uppercase block mb-3">
-                      Proveedores ({proveedores.length})
-                    </span>
-                    <div className="space-y-3">
-                      {proveedores.map((proveedor) => (
-                        <div key={proveedor.id} className="pb-3 border-b border-purple-200 last:border-0 last:pb-0">
-                          <p className="font-bold text-gray-900">{proveedor.nombre}</p>
-                          {proveedor.telefono && (
-                            <p className="text-sm text-gray-600 mt-1">📱 {proveedor.telefono}</p>
-                          )}
-                          {proveedor.email && (
-                            <p className="text-sm text-gray-600">✉️ {proveedor.email}</p>
-                          )}
-                        </div>
+                    <span className="text-xs text-blue-600 font-semibold uppercase block mb-2">Propietario{propiedad.propietarios_email.length > 1 ? 's' : ''}</span>
+                    <div className="space-y-1">
+                      {propiedad.propietarios_email.map((email, idx) => (
+                        <p key={idx} className="text-sm text-gray-900">✉️ {email}</p>
                       ))}
                     </div>
                   </div>
                 )}
-                
-                {!propietario && !supervisor && !inquilino && proveedores.length === 0 && (
+
+                {/* Supervisores */}
+                {propiedad.supervisores_email && propiedad.supervisores_email.length > 0 && (
+                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                    <span className="text-xs text-green-600 font-semibold uppercase block mb-2">Supervisor{propiedad.supervisores_email.length > 1 ? 'es' : ''}</span>
+                    <div className="space-y-1">
+                      {propiedad.supervisores_email.map((email, idx) => (
+                        <p key={idx} className="text-sm text-gray-900">✉️ {email}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Inquilinos */}
+                {propiedad.inquilinos_email && propiedad.inquilinos_email.length > 0 && (
+                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                    <span className="text-xs text-amber-600 font-semibold uppercase block mb-2">Inquilino{propiedad.inquilinos_email.length > 1 ? 's' : ''}</span>
+                    <div className="space-y-1">
+                      {propiedad.inquilinos_email.map((email, idx) => (
+                        <p key={idx} className="text-sm text-gray-900">✉️ {email}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!propiedad.propietarios_email?.length && !propiedad.supervisores_email?.length && !propiedad.inquilinos_email?.length && (
                   <p className="text-gray-500 text-center py-8">No hay asignaciones registradas</p>
                 )}
               </div>
@@ -1015,7 +979,7 @@ export default function HomePropiedad() {
           isOpen={showCompartir}
           onClose={() => setShowCompartir(false)}
           propiedadId={propiedadId}
-          propiedadNombre={propiedad.nombre}
+          propiedadNombre={propiedad.nombre_propiedad}
           userId={user.id}
           esPropio={propiedad.es_propio}
         />
@@ -1035,7 +999,7 @@ export default function HomePropiedad() {
                 type="text"
                 value={nombreDuplicado}
                 onChange={(e) => setNombreDuplicado(e.target.value)}
-                placeholder={`Copia de ${propiedad.nombre}`}
+                placeholder={`Copia de ${propiedad.nombre_propiedad}`}
                 className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>

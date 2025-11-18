@@ -284,20 +284,26 @@ export default function HomePropiedad() {
   }, [])
 
   const checkUser = async () => {
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (!authUser) { 
-      router.push('/login')
-      return 
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser) {
+        router.push('/login')
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single()
+
+      setUser({ ...profile, id: authUser.id })
+      await cargarPropiedad()
+    } catch (error) {
+      console.error('Error en checkUser:', error)
+      toast.error('Error de autenticación')
+      setLoading(false) // CRÍTICO: Siempre quitar el loading
     }
-    
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', authUser.id)
-      .single()
-    
-    setUser({ ...profile, id: authUser.id })
-    cargarPropiedad()
   }
 
   const cargarPropiedad = async () => {

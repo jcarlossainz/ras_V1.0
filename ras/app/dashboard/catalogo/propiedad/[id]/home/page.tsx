@@ -58,38 +58,36 @@ interface Ubicacion {
 
 interface PropiedadData {
   id: string
-  user_id: string
-  nombre: string
+  owner_id: string
+  nombre_propiedad: string
   tipo_propiedad: string
   estados: string[]
   mobiliario: string
-  capacidad_personas: number | null
-  tamano_terreno: number | null
-  tamano_construccion: number | null
-  
-  // ✅ NUEVO: Ubicación como JSON
+
+  // Dimensiones en JSONB
+  dimensiones?: {
+    terreno?: { valor: number; unidad: string }
+    construccion?: { valor: number; unidad: string }
+  } | null
+
+  // Ubicación como JSON
   ubicacion: Ubicacion | null
-  
-  // ✅ NUEVO: Precios consolidados
+
+  // Precios consolidados
   precios?: {
     mensual?: number | null
     noche?: number | null
     venta?: number | null
   }
-  
-  // ✅ NUEVO: Datos condicionales
-  datos_renta_largo_plazo?: any | null
-  datos_renta_vacacional?: any | null
-  datos_venta?: any | null
-  
-  // Contactos (IDs)
-  propietario_id: string | null
-  supervisor_id: string | null
-  inquilino_id: string | null
-  
+
+  // Contactos (arrays de emails)
+  propietarios_email: string[]
+  supervisores_email: string[]
+  inquilinos_email: string[]
+
   // Espacios
   espacios: Espacio[] | null
-  
+
   created_at: string
   updated_at: string
   es_propio: boolean
@@ -292,22 +290,17 @@ export default function HomePropiedad() {
         .from('propiedades')
         .select(`
           id,
-          user_id,
-          nombre,
+          owner_id,
+          nombre_propiedad,
           tipo_propiedad,
           estados,
           mobiliario,
-          capacidad_personas,
-          tamano_terreno,
-          tamano_construccion,
+          dimensiones,
           ubicacion,
           precios,
-          datos_renta_largo_plazo,
-          datos_renta_vacacional,
-          datos_venta,
-          propietario_id,
-          supervisor_id,
-          inquilino_id,
+          propietarios_email,
+          supervisores_email,
+          inquilinos_email,
           espacios,
           created_at,
           updated_at
@@ -316,9 +309,9 @@ export default function HomePropiedad() {
         .single()
 
       if (error) throw error
-      
+
       const { data: { user: authUser } } = await supabase.auth.getUser()
-      const esPropio = propData.user_id === authUser?.id
+      const esPropio = propData.owner_id === authUser?.id
       
       logger.log('=== DATOS DE PROPIEDAD ===')
       logger.log('Propiedad completa:', propData)
@@ -340,52 +333,12 @@ export default function HomePropiedad() {
       
       setPropiedad({ ...propData, es_propio: esPropio })
 
-      if (propData.propietario_id) {
-        const { data: propietarioData } = await supabase
-          .from('contactos')
-          .select('*')
-          .eq('id', propData.propietario_id)
-          .single()
-        setPropietario(propietarioData)
-      }
+      // TODO: Actualizar lógica de contactos para usar arrays de emails
+      // Los campos propietario_id, supervisor_id, inquilino_id ya no existen
+      // Ahora son: propietarios_email[], supervisores_email[], inquilinos_email[]
 
-      if (propData.supervisor_id) {
-        const { data: supervisorData } = await supabase
-          .from('contactos')
-          .select('*')
-          .eq('id', propData.supervisor_id)
-          .single()
-        setSupervisor(supervisorData)
-      }
-
-      if (propData.inquilino_id) {
-        const { data: inquilinoData } = await supabase
-          .from('contactos')
-          .select('*')
-          .eq('id', propData.inquilino_id)
-          .single()
-        setInquilino(inquilinoData)
-      }
-
-      // Cargar proveedores desde los servicios
-      const { data: servicios } = await supabase
-        .from('servicios_inmueble')
-        .select('proveedor_id')
-        .eq('propiedad_id', propiedadId)
-        .not('proveedor_id', 'is', null)
-
-      if (servicios && servicios.length > 0) {
-        const proveedorIds = [...new Set(servicios.map(s => s.proveedor_id).filter(Boolean))]
-        
-        if (proveedorIds.length > 0) {
-          const { data: proveedoresData } = await supabase
-            .from('contactos')
-            .select('*')
-            .in('id', proveedorIds)
-          
-          setProveedores(proveedoresData || [])
-        }
-      }
+      // Por ahora, comentado para que la página cargue sin errores
+      // Se puede implementar búsqueda de contactos por email si es necesario
 
     } catch (error: any) {
       logger.error('Error al cargar propiedad:', error)
@@ -517,7 +470,7 @@ export default function HomePropiedad() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopBar title={propiedad.nombre} showBackButton={true} onBack={volverCatalogo} />
+      <TopBar title={propiedad.nombre_propiedad} showBackButton={true} onBack={volverCatalogo} />
 
       <main className="max-w-5xl mx-auto px-5 py-6">
         {/* Navegación rápida */}
@@ -702,27 +655,20 @@ export default function HomePropiedad() {
                   </>
                 )}
                 
-                {propiedad.capacidad_personas && (
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-gray-600 font-medium">Capacidad:</span>
-                    <span className="text-gray-900 font-semibold">{propiedad.capacidad_personas} personas</span>
-                  </div>
-                )}
-                
-                {propiedad.tamano_terreno && (
+                {propiedad.dimensiones?.terreno?.valor && (
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">Terreno:</span>
                     <span className="text-gray-900 font-semibold">
-                      {propiedad.tamano_terreno} m²
+                      {propiedad.dimensiones.terreno.valor} {propiedad.dimensiones.terreno.unidad}
                     </span>
                   </div>
                 )}
-                
-                {propiedad.tamano_construccion && (
+
+                {propiedad.dimensiones?.construccion?.valor && (
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">Construcción:</span>
                     <span className="text-gray-900 font-semibold">
-                      {propiedad.tamano_construccion} m²
+                      {propiedad.dimensiones.construccion.valor} {propiedad.dimensiones.construccion.unidad}
                     </span>
                   </div>
                 )}
@@ -1129,7 +1075,7 @@ export default function HomePropiedad() {
           isOpen={showCompartir}
           onClose={() => setShowCompartir(false)}
           propiedadId={propiedadId}
-          propiedadNombre={propiedad.nombre}
+          propiedadNombre={propiedad.nombre_propiedad}
           userId={user.id}
           esPropio={propiedad.es_propio}
         />
@@ -1149,7 +1095,7 @@ export default function HomePropiedad() {
                 type="text"
                 value={nombreDuplicado}
                 onChange={(e) => setNombreDuplicado(e.target.value)}
-                placeholder={`Copia de ${propiedad.nombre}`}
+                placeholder={`Copia de ${propiedad.nombre_propiedad}`}
                 className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>

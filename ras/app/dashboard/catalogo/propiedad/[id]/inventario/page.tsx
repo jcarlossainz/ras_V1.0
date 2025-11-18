@@ -1,4 +1,3 @@
-// 📁 src/app/dashboard/propiedad/[id]/inventario/page.tsx
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
@@ -275,28 +274,26 @@ export default function InventarioPage() {
         onLogout={handleLogout}
       />
 
-      <main className="max-w-5xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Barra de acción superior */}
-        {inventory.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 mb-6">
-            <div className="flex items-center justify-between">
-              {/* Botón Analizar a la IZQUIERDA */}
-              <button
-                onClick={handleAnalyzeAll}
-                disabled={analyzing}
-                className="px-6 py-3 bg-gradient-to-r from-ras-azul to-ras-turquesa text-white rounded-xl hover:shadow-xl transition-all disabled:bg-gray-400 font-semibold"
-              >
-                {analyzing ? 'Analizando...' : '🔍 Analizar Galería'}
-              </button>
-              
-              {/* Total de Items a la DERECHA */}
-              <div className="text-right">
-                <h3 className="text-sm font-medium text-gray-600 mb-1">Total de Items</h3>
-                <p className="text-4xl font-bold text-ras-azul">{inventory.length}</p>
-              </div>
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 mb-6">
+          <div className="flex items-center justify-between">
+            {/* Botón Analizar a la IZQUIERDA */}
+            <button
+              onClick={handleAnalyzeAll}
+              disabled={analyzing}
+              className="px-6 py-3 bg-gradient-to-r from-ras-azul to-ras-turquesa text-white rounded-xl hover:shadow-xl transition-all disabled:bg-gray-400 font-semibold"
+            >
+              {analyzing ? 'Analizando...' : '🔍 Analizar Galería'}
+            </button>
+            
+            {/* Total de Items a la DERECHA */}
+            <div className="text-right">
+              <h3 className="text-sm font-medium text-gray-600 mb-1">Total de Items</h3>
+              <p className="text-4xl font-bold text-ras-azul">{inventory.length}</p>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Barra de búsqueda y filtros */}
         <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-300 p-4 mb-6">
@@ -340,46 +337,49 @@ export default function InventarioPage() {
           </div>
         </div>
 
-        {/* Tabla de inventario */}
+        {/* TABLA DE INVENTARIO - FORMATO LISTADO */}
         {filteredInventory.length > 0 ? (
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-            {/* Encabezados */}
-            <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-6 py-3">
-              <div className="grid grid-cols-12 gap-4 items-center text-sm font-semibold text-gray-600">
+            {/* Encabezados de la tabla */}
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-6 py-4">
+              <div className="grid grid-cols-12 gap-4 items-center text-sm font-semibold text-gray-600 uppercase tracking-wide">
                 <div className="col-span-1">Imagen</div>
-                <div className="col-span-3">Objeto</div>
-                <div className="col-span-3">Etiquetas</div>
+                <div className="col-span-2">Objeto</div>
+                <div className="col-span-4">Etiquetas</div>
                 <div className="col-span-3">Espacio</div>
                 <div className="col-span-2 text-center">Acciones</div>
               </div>
             </div>
 
-            {/* Filas */}
+            {/* Filas de la tabla */}
             <div className="divide-y divide-gray-100">
               {filteredInventory.map((item) => (
                 <div key={item.id} className="px-6 py-4 hover:bg-gray-50 transition-all">
                   <div className="grid grid-cols-12 gap-4 items-center">
-                    {/* Imagen */}
+                    {/* Columna: Imagen */}
                     <div className="col-span-1">
                       <img
                         src={item.image_url}
                         alt={item.object_name}
-                        className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200"
+                        className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200 shadow-sm"
                       />
                     </div>
 
-                    {/* Objeto */}
-                    <div className="col-span-3">
-                      <div className="text-sm font-medium text-gray-900">
+                    {/* Columna: Objeto */}
+                    <div className="col-span-2">
+                      <div className="text-sm font-semibold text-gray-900">
                         {item.object_name}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {Math.round(item.confidence * 100)}% confianza
                       </div>
                     </div>
 
-                    {/* Etiquetas */}
-                    <div className="col-span-3">
+                    {/* Columna: Etiquetas */}
+                    <div className="col-span-4">
                       {item.labels ? (
                         <div className="flex flex-wrap gap-1">
-                          {item.labels.split(',').slice(0, 3).map((label, idx) => (
+                          {item.labels.split(',').slice(0, 4).map((label, idx) => (
                             <span
                               key={idx}
                               className="px-2 py-1 text-xs rounded-lg bg-purple-100 text-purple-700 font-medium"
@@ -387,32 +387,32 @@ export default function InventarioPage() {
                               {label.trim()}
                             </span>
                           ))}
-                          {item.labels.split(',').length > 3 && (
+                          {item.labels.split(',').length > 4 && (
                             <span className="px-2 py-1 text-xs rounded-lg bg-gray-100 text-gray-600">
-                              +{item.labels.split(',').length - 3}
+                              +{item.labels.split(',').length - 4}
                             </span>
                           )}
                         </div>
                       ) : (
-                        <span className="text-sm text-gray-400">Sin etiquetas</span>
+                        <span className="text-sm text-gray-400 italic">Sin etiquetas</span>
                       )}
                     </div>
 
-                    {/* Espacio - MOSTRANDO NOMBRE REAL */}
+                    {/* Columna: Espacio */}
                     <div className="col-span-3">
-                      <span className="px-3 py-1 text-sm rounded-lg bg-blue-100 text-blue-700 font-medium">
-                        {getSpaceName(item.space_type)}
+                      <span className="inline-block px-3 py-1.5 text-sm rounded-lg bg-blue-100 text-blue-700 font-medium">
+                        📍 {getSpaceName(item.space_type)}
                       </span>
                     </div>
 
-                    {/* Acciones */}
+                    {/* Columna: Acciones */}
                     <div className="col-span-2">
                       <div className="flex gap-2 justify-center">
-                        {/* Editar */}
+                        {/* Botón Editar */}
                         <button
                           onClick={() => handleEditItem(item)}
                           className="w-10 h-10 rounded-lg border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 hover:scale-110 transition-all flex items-center justify-center group"
-                          title="Editar"
+                          title="Editar item"
                         >
                           <svg className="w-5 h-5 text-blue-600 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -420,15 +420,17 @@ export default function InventarioPage() {
                           </svg>
                         </button>
 
-                        {/* Eliminar */}
+                        {/* Botón Eliminar */}
                         <button
                           onClick={() => handleDeleteItem(item.id)}
                           className="w-10 h-10 rounded-lg border-2 border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-400 hover:scale-110 transition-all flex items-center justify-center group"
-                          title="Eliminar"
+                          title="Eliminar item"
                         >
                           <svg className="w-5 h-5 text-red-600 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <line x1="18" y1="6" x2="6" y2="18"/>
-                            <line x1="6" y1="6" x2="18" y2="18"/>
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            <line x1="10" y1="11" x2="10" y2="17"/>
+                            <line x1="14" y1="11" x2="14" y2="17"/>
                           </svg>
                         </button>
                       </div>

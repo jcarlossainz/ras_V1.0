@@ -19,13 +19,6 @@ import CompartirPropiedad from '@/components/CompartirPropiedad'
 import { getPropertyImages } from '@/lib/supabase/supabase-storage'
 import type { PropertyImage } from '@/types/property'
 
-interface Contacto {
-  id: string
-  nombre: string
-  telefono: string
-  email: string
-}
-
 interface Espacio {
   id: string
   name: string
@@ -273,10 +266,6 @@ export default function HomePropiedad() {
 
   const [loading, setLoading] = useState(true)
   const [propiedad, setPropiedad] = useState<PropiedadData | null>(null)
-  const [propietario, setPropietario] = useState<Contacto | null>(null)
-  const [supervisor, setSupervisor] = useState<Contacto | null>(null)
-  const [inquilino, setInquilino] = useState<Contacto | null>(null)
-  const [proveedores, setProveedores] = useState<Contacto[]>([])
 
   // Estados para modales
   const [showCompartir, setShowCompartir] = useState(false)
@@ -366,30 +355,6 @@ export default function HomePropiedad() {
     await supabase.auth.signOut()
     router.push('/login')
   }, [confirm, router])
-
-  const irAGaleria = useCallback(() => {
-    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/galeria`)
-  }, [router, propiedadId])
-
-  const irATickets = useCallback(() => {
-    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/tickets`)
-  }, [router, propiedadId])
-
-  const irACalendario = useCallback(() => {
-    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/calendario`)
-  }, [router, propiedadId])
-
-  const irABalance = useCallback(() => {
-    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/balance`)
-  }, [router, propiedadId])
-
-  const irAAnuncio = useCallback(() => {
-    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/anuncio`)
-  }, [router, propiedadId])
-
-  const irAInventario = useCallback(() => {
-    router.push(`/dashboard/catalogo/propiedad/${propiedadId}/inventario`)
-  }, [router, propiedadId])
 
   const editarPropiedad = useCallback(() => {
     toast.info('Función de editar en desarrollo')
@@ -488,118 +453,6 @@ export default function HomePropiedad() {
       />
 
       <main className="max-w-5xl mx-auto px-5 py-6">
-        {/* Navegación rápida */}
-        <div className="mb-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <button
-            onClick={irATickets}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
-          >
-            <svg
-              className="w-5 h-5 text-gray-600 group-hover:text-blue-600"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-              />
-            </svg>
-            <span className="font-semibold text-gray-900 group-hover:text-blue-600">Tickets</span>
-          </button>
-
-          <button
-            onClick={irAGaleria}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all group"
-          >
-            <svg
-              className="w-5 h-5 text-gray-600 group-hover:text-purple-600"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <polyline points="21 15 16 10 5 21" />
-            </svg>
-            <span className="font-semibold text-gray-900 group-hover:text-purple-600">Galería</span>
-          </button>
-
-          <button
-            onClick={irACalendario}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all group"
-          >
-            <svg
-              className="w-5 h-5 text-gray-600 group-hover:text-green-600"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-            <span className="font-semibold text-gray-900 group-hover:text-green-600">Calendario</span>
-          </button>
-
-          <button
-            onClick={irABalance}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group"
-          >
-            <svg
-              className="w-5 h-5 text-gray-600 group-hover:text-orange-600"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <line x1="12" y1="1" x2="12" y2="23" />
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
-            <span className="font-semibold text-gray-900 group-hover:text-orange-600">Balance</span>
-          </button>
-
-          <button
-            onClick={irAAnuncio}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-pink-500 hover:bg-pink-50 transition-all group"
-          >
-            <svg
-              className="w-5 h-5 text-gray-600 group-hover:text-pink-600"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" strokeLinecap="round" strokeLinejoin="round"/>
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
-            <span className="font-semibold text-gray-900 group-hover:text-pink-600">Anuncio</span>
-          </button>
-
-          <button
-            onClick={irAInventario}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-amber-500 hover:bg-amber-50 transition-all group"
-          >
-            <svg
-              className="w-5 h-5 text-gray-600 group-hover:text-amber-600"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-              <line x1="12" y1="22.08" x2="12" y2="12"/>
-            </svg>
-            <span className="font-semibold text-gray-900 group-hover:text-amber-600">Inventario</span>
-          </button>
-        </div>
-
         {/* Header con badges */}
         <div className="mb-6">
           {/* Badges de estados y tipo */}
@@ -647,52 +500,57 @@ export default function HomePropiedad() {
               </div>
               
               <div className="space-y-2">
+                {/* Mobiliario */}
                 <div className="flex justify-between items-center py-2 border-b border-gray-100">
                   <span className="text-gray-600 font-medium">Mobiliario:</span>
                   <span className="text-gray-900 font-semibold">{propiedad.mobiliario}</span>
                 </div>
-                
+
+                {/* ✅ Habitaciones y Baños en el MISMO renglón */}
                 {propiedad.espacios && (
-                  <>
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <div className="grid grid-cols-2 gap-4 py-2 border-b border-gray-100">
+                    <div className="flex justify-between items-center">
                       <span className="text-gray-600 font-medium">Habitaciones:</span>
                       <span className="text-gray-900 font-semibold">
                         {propiedad.espacios.filter(e => e.type === 'Habitación' || e.type === 'Lock-off').length}
                       </span>
                     </div>
-                    
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <div className="flex justify-between items-center">
                       <span className="text-gray-600 font-medium">Baños:</span>
                       <span className="text-gray-900 font-semibold">
                         {propiedad.espacios.filter(e => e.type === 'Baño completo' || e.type === 'Medio baño').length}
                       </span>
                     </div>
-                  </>
-                )}
-                
-                {propiedad.dimensiones?.terreno?.valor && (
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-gray-600 font-medium">Terreno:</span>
-                    <span className="text-gray-900 font-semibold">
-                      {propiedad.dimensiones.terreno.valor} {propiedad.dimensiones.terreno.unidad}
-                    </span>
                   </div>
                 )}
 
-                {propiedad.dimensiones?.construccion?.valor && (
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-gray-600 font-medium">Construcción:</span>
-                    <span className="text-gray-900 font-semibold">
-                      {propiedad.dimensiones.construccion.valor} {propiedad.dimensiones.construccion.unidad}
-                    </span>
+                {/* ✅ Terreno y Construcción en el MISMO renglón */}
+                {(propiedad.dimensiones?.terreno?.valor || propiedad.dimensiones?.construccion?.valor) && (
+                  <div className="grid grid-cols-2 gap-4 py-2 border-b border-gray-100">
+                    {propiedad.dimensiones?.terreno?.valor && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium">Terreno:</span>
+                        <span className="text-gray-900 font-semibold">
+                          {propiedad.dimensiones.terreno.valor} {propiedad.dimensiones.terreno.unidad}
+                        </span>
+                      </div>
+                    )}
+                    {propiedad.dimensiones?.construccion?.valor && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 font-medium">Construcción:</span>
+                        <span className="text-gray-900 font-semibold">
+                          {propiedad.dimensiones.construccion.valor} {propiedad.dimensiones.construccion.unidad}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* ✅ PRECIOS agregados aquí */}
+                {/* ✅ PRECIOS - Ahora con más espacio y tamaño más grande */}
                 {propiedad.precios?.mensual && (
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">Renta mensual:</span>
-                    <span className="text-green-600 font-bold">
+                    <span className="text-green-600 font-bold text-lg">
                       ${propiedad.precios.mensual.toLocaleString('es-MX')} MXN
                     </span>
                   </div>
@@ -701,7 +559,7 @@ export default function HomePropiedad() {
                 {propiedad.precios?.noche && (
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">Precio por noche:</span>
-                    <span className="text-blue-600 font-bold">
+                    <span className="text-blue-600 font-bold text-lg">
                       ${propiedad.precios.noche.toLocaleString('es-MX')} MXN
                     </span>
                   </div>
@@ -710,7 +568,7 @@ export default function HomePropiedad() {
                 {propiedad.precios?.venta && (
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-600 font-medium">Precio de venta:</span>
-                    <span className="text-purple-600 font-bold">
+                    <span className="text-purple-600 font-bold text-lg">
                       ${propiedad.precios.venta.toLocaleString('es-MX')} MXN
                     </span>
                   </div>
@@ -881,70 +739,53 @@ export default function HomePropiedad() {
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 font-poppins">Asignaciones</h2>
               </div>
-              
+
               <div className="space-y-4">
-                {propietario && (
+                {/* Propietarios */}
+                {propiedad.propietarios_email && propiedad.propietarios_email.length > 0 && (
                   <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <span className="text-xs text-blue-600 font-semibold uppercase">Propietario</span>
-                    <p className="text-lg font-bold text-gray-900 mt-1">{propietario.nombre}</p>
-                    {propietario.telefono && (
-                      <p className="text-sm text-gray-600 mt-1">📱 {propietario.telefono}</p>
-                    )}
-                    {propietario.email && (
-                      <p className="text-sm text-gray-600">✉️ {propietario.email}</p>
-                    )}
-                  </div>
-                )}
-                
-                {supervisor && (
-                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                    <span className="text-xs text-green-600 font-semibold uppercase">Supervisor</span>
-                    <p className="text-lg font-bold text-gray-900 mt-1">{supervisor.nombre}</p>
-                    {supervisor.telefono && (
-                      <p className="text-sm text-gray-600 mt-1">📱 {supervisor.telefono}</p>
-                    )}
-                    {supervisor.email && (
-                      <p className="text-sm text-gray-600">✉️ {supervisor.email}</p>
-                    )}
-                  </div>
-                )}
-                
-                {inquilino && (
-                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                    <span className="text-xs text-amber-600 font-semibold uppercase">Inquilino</span>
-                    <p className="text-lg font-bold text-gray-900 mt-1">{inquilino.nombre}</p>
-                    {inquilino.telefono && (
-                      <p className="text-sm text-gray-600 mt-1">📱 {inquilino.telefono}</p>
-                    )}
-                    {inquilino.email && (
-                      <p className="text-sm text-gray-600">✉️ {inquilino.email}</p>
-                    )}
-                  </div>
-                )}
-                
-                {/* Proveedores */}
-                {proveedores.length > 0 && (
-                  <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                    <span className="text-xs text-purple-600 font-semibold uppercase block mb-3">
-                      Proveedores ({proveedores.length})
+                    <span className="text-xs text-blue-600 font-semibold uppercase block mb-2">
+                      Propietario{propiedad.propietarios_email.length > 1 ? 's' : ''}
                     </span>
-                    <div className="space-y-3">
-                      {proveedores.map((proveedor) => (
-                        <div key={proveedor.id} className="pb-3 border-b border-purple-200 last:border-0 last:pb-0">
-                          <p className="font-bold text-gray-900">{proveedor.nombre}</p>
-                          {proveedor.telefono && (
-                            <p className="text-sm text-gray-600 mt-1">📱 {proveedor.telefono}</p>
-                          )}
-                          {proveedor.email && (
-                            <p className="text-sm text-gray-600">✉️ {proveedor.email}</p>
-                          )}
-                        </div>
+                    <div className="space-y-1">
+                      {propiedad.propietarios_email.map((email, idx) => (
+                        <p key={idx} className="text-sm text-gray-900 font-medium">✉️ {email}</p>
                       ))}
                     </div>
                   </div>
                 )}
-                
-                {!propietario && !supervisor && !inquilino && proveedores.length === 0 && (
+
+                {/* Supervisores */}
+                {propiedad.supervisores_email && propiedad.supervisores_email.length > 0 && (
+                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                    <span className="text-xs text-green-600 font-semibold uppercase block mb-2">
+                      Supervisor{propiedad.supervisores_email.length > 1 ? 'es' : ''}
+                    </span>
+                    <div className="space-y-1">
+                      {propiedad.supervisores_email.map((email, idx) => (
+                        <p key={idx} className="text-sm text-gray-900 font-medium">✉️ {email}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Inquilinos */}
+                {propiedad.inquilinos_email && propiedad.inquilinos_email.length > 0 && (
+                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                    <span className="text-xs text-amber-600 font-semibold uppercase block mb-2">
+                      Inquilino{propiedad.inquilinos_email.length > 1 ? 's' : ''}
+                    </span>
+                    <div className="space-y-1">
+                      {propiedad.inquilinos_email.map((email, idx) => (
+                        <p key={idx} className="text-sm text-gray-900 font-medium">✉️ {email}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(!propiedad.propietarios_email || propiedad.propietarios_email.length === 0) &&
+                 (!propiedad.supervisores_email || propiedad.supervisores_email.length === 0) &&
+                 (!propiedad.inquilinos_email || propiedad.inquilinos_email.length === 0) && (
                   <p className="text-gray-500 text-center py-8">No hay asignaciones registradas</p>
                 )}
               </div>

@@ -191,16 +191,26 @@ export default function GaleriaPage() {
               file.name
             )
 
+            const esPrimeraFoto = photos.length === 0 && i === 0
+
             newPhotos.push({
               id: uploaded.id,
               url: uploaded.urls.display,
               url_thumbnail: uploaded.urls.thumbnail,
-              is_cover: photos.length === 0 && i === 0,
+              is_cover: esPrimeraFoto,
               caption: file.name,
               created_at: new Date().toISOString(),
               space_type: 'sin-espacio',
               property_id: propertyId
             })
+
+            // ✅ FIX: Si es la primera foto, establecer como portada en la BD
+            if (esPrimeraFoto) {
+              await supabase
+                .from('property_images')
+                .update({ is_cover: true })
+                .eq('id', uploaded.id)
+            }
           } catch (fileError) {
             logger.error(`Error con archivo ${file.name}:`, fileError)
             toast.error(`Error al subir ${file.name}`)
@@ -415,7 +425,7 @@ export default function GaleriaPage() {
                   className="hidden"
                 />
                 <div className="px-6 py-2 bg-gradient-to-r from-ras-azul to-ras-turquesa text-white rounded-lg font-semibold hover:shadow-lg transition-all hover:scale-105 active:scale-95 whitespace-nowrap">
-                  {isUploading ? '⏳ Subiendo...' : '📸 Subir'}
+                  {isUploading ? 'Subiendo...' : 'Subir'}
                 </div>
               </label>
             )}
@@ -573,7 +583,7 @@ export default function GaleriaPage() {
             }
             title={photos.length === 0 ? "No hay fotos en la galería" : "No se encontraron resultados"}
             description={photos.length === 0 ? "Sube la primera foto de tu propiedad" : "Intenta con otra búsqueda o cambia los filtros"}
-            actionLabel={photos.length === 0 ? "📸 Subir Fotos" : undefined}
+            actionLabel={photos.length === 0 ? "Subir Fotos" : undefined}
             onAction={photos.length === 0 ? () => document.querySelector('input[type="file"]')?.click() : undefined}
           />
         )}

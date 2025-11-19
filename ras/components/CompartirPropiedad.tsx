@@ -17,9 +17,10 @@ interface CompartirPropiedadProps {
 
 interface Colaborador {
   id: string
-  user_id: string
+  user_id: string | null
   email: string
   full_name?: string
+  pendiente?: boolean
 }
 
 export default function CompartirPropiedad({
@@ -46,7 +47,7 @@ export default function CompartirPropiedad({
     try {
       const { data, error } = await supabase
         .from('propiedades_colaboradores')
-        .select('id, user_id')
+        .select('id, user_id, email_invitado')
         .eq('propiedad_id', propiedadId)
 
       if (error) {
@@ -57,22 +58,35 @@ export default function CompartirPropiedad({
 
       // Cargar datos de perfil de cada colaborador
       const colaboradoresConDatos = await Promise.all(
-        (data || []).map(async (colab) => {
-          const { data: perfil } = await supabase
-            .from('profiles')
-            .select('email, full_name')
-            .eq('id', colab.user_id)
-            .single()
+        (data || []).map(async (colab: any) => {
+          // Si tiene user_id, buscar en profiles
+          if (colab.user_id) {
+            const { data: perfil } = await supabase
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', colab.user_id)
+              .maybeSingle()
 
-          return {
-            id: colab.id,
-            user_id: colab.user_id,
-            email: perfil?.email || 'Sin email',
-            full_name: perfil?.full_name
+            return {
+              id: colab.id,
+              user_id: colab.user_id,
+              email: perfil?.email || colab.email_invitado || 'Sin email',
+              full_name: perfil?.full_name,
+              pendiente: false
+            }
+          } else {
+            // Si no tiene user_id, es una invitación pendiente
+            return {
+              id: colab.id,
+              user_id: null,
+              email: colab.email_invitado || 'Sin email',
+              full_name: null,
+              pendiente: true
+            }
           }
         })
       )
-      
+
       console.log('Colaboradores cargados:', colaboradoresConDatos)
       setColaboradores(colaboradoresConDatos)
     } catch (error) {
@@ -89,44 +103,54 @@ export default function CompartirPropiedad({
     try {
       const emailBuscar = emailColaborador.trim().toLowerCase()
 
-      // Buscar usuario por email
-      const { data: perfilData, error: perfilError } = await supabase
-        .from('profiles')
-        .select('id, email')
-        .eq('email', emailBuscar)
-        .single()
-
-      if (perfilError || !perfilData) {
-        alert('❌ Usuario no encontrado')
+      // Validar formato de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(emailBuscar)) {
+        alert('❌ Email inválido')
         setAgregando(false)
         return
       }
 
-      if (perfilData.id === userId) {
+      // No validar si existe el usuario - permitir agregar cualquier email
+      // La asociación se hará cuando el usuario se registre con ese email
+
+      // Buscar si el usuario YA existe (opcional, pero no requerido)
+      const { data: perfilData } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('email', emailBuscar)
+        .maybeSingle()
+
+      // Si el usuario existe y es el propietario, no permitir
+      if (perfilData && perfilData.id === userId) {
         alert('❌ No puedes agregarte a ti mismo')
         setAgregando(false)
         return
       }
 
-      // Agregar colaborador
+      // Agregar colaborador con user_id si existe, o NULL si no existe aún
       const { error: insertError } = await supabase
         .from('propiedades_colaboradores')
         .insert({
           propiedad_id: propiedadId,
-          user_id: perfilData.id,
+          user_id: perfilData?.id || null,  // NULL si no existe aún
+          email_invitado: emailBuscar,      // Guardar el email para cuando se registre
           agregado_por: userId
         })
 
       if (insertError) {
         if (insertError.code === '23505') {
-          alert('⚠️ Este usuario ya es colaborador')
+          alert('⚠️ Este email ya está invitado')
         } else {
           alert('❌ Error: ' + insertError.message)
         }
         setAgregando(false)
       } else {
         setEmailColaborador('')
-        alert('✅ Colaborador agregado correctamente')
+        alert(perfilData
+          ? '✅ Colaborador agregado correctamente'
+          : '✅ Invitación enviada. Tendrá acceso cuando se registre con este email'
+        )
         // Recargar colaboradores después de agregar
         await cargarColaboradores()
         setAgregando(false)
@@ -197,15 +221,31 @@ export default function CompartirPropiedad({
               {colaboradores.map((colab) => (
                 <div
                   key={colab.id}
-                  className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-200"
+                  className={`flex justify-between items-center p-4 rounded-xl border ${
+                    colab.pendiente
+                      ? 'bg-yellow-50 border-yellow-200'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}
                 >
                   <div>
-                    <div className="font-semibold text-gray-800 font-roboto">
-                      {colab.email}
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-800 font-roboto">
+                        {colab.email}
+                      </span>
+                      {colab.pendiente && (
+                        <span className="text-xs px-2 py-0.5 bg-yellow-200 text-yellow-800 rounded-full font-medium">
+                          Pendiente
+                        </span>
+                      )}
                     </div>
                     {colab.full_name && (
-                      <div className="text-sm text-gray-500 font-roboto">
+                      <div className="text-sm text-gray-500 font-roboto mt-1">
                         {colab.full_name}
+                      </div>
+                    )}
+                    {colab.pendiente && (
+                      <div className="text-xs text-gray-500 font-roboto mt-1">
+                        Tendrá acceso cuando se registre
                       </div>
                     )}
                   </div>

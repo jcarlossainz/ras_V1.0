@@ -66,11 +66,15 @@ export default function WizardContainer({
   
   useEffect(() => {
     if (mode === 'edit' && initialPropertyId) {
+      let isMounted = true;
+
       const loadData = async () => {
         console.log(`📖 Cargando propiedad en modo edición: ${initialPropertyId}`);
-        
+
         const result = await loadProperty(initialPropertyId);
-        
+
+        if (!isMounted) return; // Evitar actualizar si el componente se desmontó
+
         if (result.success && result.data) {
           setFormData(result.data);
           setPropertyId(initialPropertyId);
@@ -97,14 +101,19 @@ export default function WizardContainer({
           setCurrentStep(actualStep);
 
           console.log('✅ Propiedad cargada en step:', actualStep);
+          // ✅ NO mostrar toast - puede causar bucles
         } else {
           toast.error(`❌ Error al cargar: ${result.error}`);
         }
       };
-      
+
       loadData();
+
+      return () => {
+        isMounted = false;
+      };
     }
-  }, [mode, initialPropertyId, loadProperty, toast]);
+  }, [mode, initialPropertyId, loadProperty, totalSteps, toast]);
   
   // ============================================================================
   // ACTUALIZAR DATOS DEL FORMULARIO

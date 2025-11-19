@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { useToast } from '@/hooks/useToast'
+import { useConfirm } from '@/components/ui/confirm-modal'
 import Modal from '@/components/ui/modal'
 import Input from '@/components/ui/input'
 import Button from '@/components/ui/button'
@@ -31,6 +33,8 @@ export default function CompartirPropiedad({
   userId,
   esPropio
 }: CompartirPropiedadProps) {
+  const toast = useToast()
+  const confirm = useConfirm()
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([])
   const [emailColaborador, setEmailColaborador] = useState('')
   const [agregando, setAgregando] = useState(false)
@@ -106,7 +110,7 @@ export default function CompartirPropiedad({
       // Validar formato de email
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (!emailRegex.test(emailBuscar)) {
-        alert('❌ Email inválido')
+        toast.error('Email inválido')
         setAgregando(false)
         return
       }
@@ -123,7 +127,7 @@ export default function CompartirPropiedad({
 
       // Si el usuario existe y es el propietario, no permitir
       if (perfilData && perfilData.id === userId) {
-        alert('❌ No puedes agregarte a ti mismo')
+        toast.error('No puedes agregarte a ti mismo')
         setAgregando(false)
         return
       }
@@ -139,30 +143,34 @@ export default function CompartirPropiedad({
 
       if (insertError) {
         if (insertError.code === '23505') {
-          alert('⚠️ Este email ya está invitado')
+          toast.warning('Este email ya está invitado')
         } else {
-          alert('❌ Error: ' + insertError.message)
+          toast.error('Error: ' + insertError.message)
         }
         setAgregando(false)
       } else {
         setEmailColaborador('')
-        alert(perfilData
-          ? '✅ Colaborador agregado correctamente'
-          : '✅ Invitación enviada. Tendrá acceso cuando se registre con este email'
+        toast.success(perfilData
+          ? 'Colaborador agregado correctamente'
+          : 'Invitación enviada. Tendrá acceso cuando se registre con este email'
         )
         // Recargar colaboradores después de agregar
         await cargarColaboradores()
         setAgregando(false)
       }
     } catch (err) {
-      alert('❌ Error: ' + (err as Error).message)
+      toast.error('Error: ' + (err as Error).message)
     } finally {
       setAgregando(false)
     }
   }
 
   const eliminarColaborador = async (colaboradorId: string, emailColab: string) => {
-    if (!confirm(`¿Eliminar a ${emailColab} de esta propiedad?`)) return
+    const confirmed = await confirm.danger(
+      `¿Eliminar a ${emailColab}?`,
+      'Esta persona perderá el acceso a esta propiedad'
+    )
+    if (!confirmed) return
 
     try {
       const { error } = await supabase
@@ -172,10 +180,10 @@ export default function CompartirPropiedad({
 
       if (error) throw error
 
-      alert('✅ Colaborador eliminado')
+      toast.success('Colaborador eliminado')
       cargarColaboradores()
     } catch (err) {
-      alert('❌ Error al eliminar colaborador')
+      toast.error('Error al eliminar colaborador')
       console.error(err)
     }
   }

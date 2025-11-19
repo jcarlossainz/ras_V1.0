@@ -84,11 +84,14 @@ interface PropiedadData {
   // ✅ Servicios (JSONB[])
   servicios?: Array<{
     id?: string
-    tipo?: string
-    nombre?: string
-    proveedor?: string
-    costo?: number
-    frecuencia?: string
+    name?: string
+    type?: string
+    provider?: string
+    cost?: number
+    paymentFrequency?: string
+    accountNumber?: string
+    lastPaymentDate?: string
+    notes?: string
   }> | null
 
   created_at: string
@@ -645,8 +648,8 @@ export default function HomePropiedad() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {propiedad.servicios.map((servicio, idx) => {
-                    // Priorizar: tipo > nombre
-                    const displayName = servicio.tipo || servicio.nombre || 'Servicio sin especificar'
+                    // La estructura real usa campos en inglés
+                    const displayName = servicio.name || 'Servicio sin especificar'
 
                     return (
                       <div key={idx} className="p-4 bg-teal-50 rounded-lg border border-teal-200">
@@ -658,19 +661,14 @@ export default function HomePropiedad() {
                             <p className="text-base font-bold text-gray-900 leading-tight">
                               {displayName}
                             </p>
-                            {servicio.nombre && servicio.tipo && (
+                            {servicio.provider && (
                               <p className="text-sm text-gray-600 mt-1">
-                                {servicio.nombre}
+                                📍 {servicio.provider}
                               </p>
                             )}
-                            {servicio.proveedor && (
-                              <p className="text-sm text-gray-600 mt-1">
-                                📍 {servicio.proveedor}
-                              </p>
-                            )}
-                            {servicio.frecuencia && (
+                            {servicio.paymentFrequency && (
                               <p className="text-xs text-teal-700 mt-1 font-medium">
-                                🔄 {servicio.frecuencia}
+                                🔄 {servicio.paymentFrequency}
                               </p>
                             )}
                           </div>

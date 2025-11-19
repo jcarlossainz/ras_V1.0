@@ -12,7 +12,7 @@
 
 import React, { useCallback, useState, useEffect } from 'react';
 import { PropertyFormData, INITIAL_PROPERTY_DATA } from '@/types/property';
-import { usePropertyDatabase } from '../hooks/usePropertyDatabase';
+import { usePropertyDatabase } from '@/hooks/usePropertyDatabase';
 import { useToast } from '@/hooks/useToast';
 
 // Steps

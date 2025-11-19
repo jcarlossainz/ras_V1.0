@@ -311,35 +311,17 @@ export default function HomePropiedad() {
 
   const cargarPropiedad = async () => {
     try {
-      // ✅ OPTIMIZACIÓN: Solo traer campos necesarios para la vista
+      // Traer todos los datos de la propiedad
       const { data: propData, error } = await supabase
         .from('propiedades')
-        .select(`
-          id,
-          user_id,
-          nombre_propiedad,
-          tipo_propiedad,
-          estados,
-          mobiliario,
-          capacidad_personas,
-          tamano_terreno,
-          tamano_construccion,
-          ubicacion,
-          precios,
-          datos_renta_largo_plazo,
-          datos_renta_vacacional,
-          propietarios_email,
-          supervisores_email,
-          inquilinos_email,
-          espacios,
-          servicios,
-          created_at,
-          updated_at
-        `)
+        .select('*')
         .eq('id', propiedadId)
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Error al cargar propiedad:', error)
+        throw error
+      }
       
       const { data: { user: authUser } } = await supabase.auth.getUser()
       const esPropio = propData.user_id === authUser?.id

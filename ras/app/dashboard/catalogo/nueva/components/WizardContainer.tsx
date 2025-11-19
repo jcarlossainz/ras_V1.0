@@ -10,7 +10,7 @@
 
 'use client';
 
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { PropertyFormData, INITIAL_PROPERTY_DATA } from '@/types/property';
 import { usePropertyDatabase } from '../hooks/usePropertyDatabase';
 import { useToast } from '@/hooks/useToast';
@@ -55,7 +55,10 @@ export default function WizardContainer({
   const [formData, setFormData] = useState<PropertyFormData>(INITIAL_PROPERTY_DATA);
   const [propertyId, setPropertyId] = useState<string | null>(initialPropertyId || null);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
-  
+
+  // ✅ Ref para evitar múltiples cargas
+  const hasLoadedRef = useRef(false);
+
   const totalSteps = 5;
   const isFirstStep = currentStep === 1;
   const isLastStep = currentStep === totalSteps;
@@ -65,15 +68,14 @@ export default function WizardContainer({
   // ============================================================================
   
   useEffect(() => {
-    if (mode === 'edit' && initialPropertyId) {
-      let isMounted = true;
+    // ✅ Evitar cargas múltiples usando ref
+    if (mode === 'edit' && initialPropertyId && !hasLoadedRef.current) {
+      hasLoadedRef.current = true;
 
       const loadData = async () => {
         console.log(`📖 Cargando propiedad en modo edición: ${initialPropertyId}`);
 
         const result = await loadProperty(initialPropertyId);
-
-        if (!isMounted) return; // Evitar actualizar si el componente se desmontó
 
         if (result.success && result.data) {
           setFormData(result.data);
@@ -101,17 +103,12 @@ export default function WizardContainer({
           setCurrentStep(actualStep);
 
           console.log('✅ Propiedad cargada en step:', actualStep);
-          // ✅ NO mostrar toast - puede causar bucles
         } else {
           toast.error(`❌ Error al cargar: ${result.error}`);
         }
       };
 
       loadData();
-
-      return () => {
-        isMounted = false;
-      };
     }
   }, [mode, initialPropertyId, loadProperty, totalSteps, toast]);
   

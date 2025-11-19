@@ -491,6 +491,7 @@ export default function CatalogoPage() {
       {showWizard && (
         <Suspense fallback={<Loading message="Cargando formulario..." />}>
           <WizardModal
+            key={`wizard-${wizardMode}-${wizardPropertyId || 'new'}`}
             isOpen={showWizard}
             onClose={handleCloseWizard}
             mode={wizardMode}

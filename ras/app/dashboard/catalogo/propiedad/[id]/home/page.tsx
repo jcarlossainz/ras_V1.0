@@ -1092,6 +1092,7 @@ export default function HomePropiedad() {
       {/* Modal Editar */}
       {showWizard && (
         <WizardModal
+          key={`edit-wizard-${propiedadId}`}
           isOpen={showWizard}
           onClose={() => setShowWizard(false)}
           mode="edit"

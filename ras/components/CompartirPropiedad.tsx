@@ -134,8 +134,7 @@ export default function CompartirPropiedad({
         .insert({
           propiedad_id: propiedadId,
           user_id: perfilData?.id || null,  // NULL si no existe aún
-          email_invitado: emailBuscar,      // Guardar el email para cuando se registre
-          agregado_por: userId
+          email_invitado: emailBuscar      // Guardar el email para cuando se registre
         })
 
       if (insertError) {

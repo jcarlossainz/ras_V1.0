@@ -36,7 +36,9 @@ export default function CatalogoPage() {
   const [showWizard, setShowWizard] = useState(false)
   const [showCompartir, setShowCompartir] = useState(false)
   const [propiedadSeleccionada, setPropiedadSeleccionada] = useState<Propiedad | null>(null)
-  
+  const [wizardMode, setWizardMode] = useState<'create' | 'edit'>('create')
+  const [wizardPropertyId, setWizardPropertyId] = useState<string | undefined>(undefined)
+
   const [busqueda, setBusqueda] = useState('')
   const [filtroPropiedad, setFiltroPropiedad] = useState<'todos' | 'propios' | 'compartidos'>('todos')
 
@@ -189,9 +191,11 @@ export default function CatalogoPage() {
   }, [router])
 
   const editarPropiedad = useCallback((propiedadId: string) => {
-    toast.info('Función de edición en desarrollo')
     logger.log('Editar propiedad:', propiedadId)
-  }, [toast])
+    setWizardMode('edit')
+    setWizardPropertyId(propiedadId)
+    setShowWizard(true)
+  }, [])
 
   const eliminarPropiedad = useCallback(async (propiedadId: string, nombrePropiedad: string) => {
     if (!user?.id) return
@@ -230,6 +234,8 @@ export default function CatalogoPage() {
 
   const handleCloseWizard = useCallback(() => {
     setShowWizard(false)
+    setWizardMode('create')
+    setWizardPropertyId(undefined)
   }, [])
 
   // ⚡ OPTIMIZADO: Filtros memoizados - solo se recalculan cuando cambian las dependencias
@@ -487,9 +493,10 @@ export default function CatalogoPage() {
           <WizardModal
             isOpen={showWizard}
             onClose={handleCloseWizard}
-            mode="create"
+            mode={wizardMode}
+            propertyId={wizardPropertyId}
             onComplete={async (propertyId) => {
-              logger.log('🎉 Propiedad creada con ID:', propertyId);
+              logger.log(`🎉 Propiedad ${wizardMode === 'create' ? 'creada' : 'actualizada'} con ID:`, propertyId);
 
               // Recargar lista de propiedades
               if (user?.id) {
@@ -497,7 +504,7 @@ export default function CatalogoPage() {
               }
 
               // Mostrar toast de éxito
-              toast.success('✅ Propiedad creada exitosamente');
+              toast.success(`✅ Propiedad ${wizardMode === 'create' ? 'creada' : 'actualizada'} exitosamente`);
             }}
           />
         </Suspense>

@@ -9,6 +9,7 @@ import { useConfirm } from '@/components/ui/confirm-modal'
 import TopBar from '@/components/ui/topbar'
 import Loading from '@/components/ui/loading'
 import CompartirPropiedad from '@/components/CompartirPropiedad'
+import WizardModal from '@/app/dashboard/catalogo/nueva/components/WizardModal'
 import { getPropertyImages } from '@/lib/supabase/supabase-storage'
 import type { PropertyImage } from '@/types/property'
 
@@ -285,6 +286,7 @@ export default function HomePropiedad() {
   const [showDuplicarModal, setShowDuplicarModal] = useState(false)
   const [nombreDuplicado, setNombreDuplicado] = useState('')
   const [duplicando, setDuplicando] = useState(false)
+  const [showWizard, setShowWizard] = useState(false)
 
   useEffect(() => {
     checkUser()
@@ -412,8 +414,8 @@ export default function HomePropiedad() {
   }
 
   const editarPropiedad = () => {
-    toast.info('Función de editar en desarrollo')
-    logger.log('Editar propiedad')
+    logger.log('Editar propiedad:', propiedadId)
+    setShowWizard(true)
   }
 
   const duplicarPropiedad = async () => {
@@ -422,16 +424,26 @@ export default function HomePropiedad() {
       return
     }
 
+    if (!user?.id) {
+      toast.error('No se pudo identificar el usuario')
+      return
+    }
+
     setDuplicando(true)
 
     try {
+      // Excluir campos que no deben duplicarse
+      const { id, created_at, updated_at, es_propio, ...propiedadData } = propiedad as any
+
       const nuevaPropiedad = {
-        ...propiedad,
-        id: undefined,
+        ...propiedadData,
         nombre_propiedad: nombreDuplicado,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        user_id: user.id,
+        owner_id: user.id,
+        wizard_step: 6, // Marcar como completada
       }
+
+      logger.log('Duplicando propiedad con datos:', nuevaPropiedad)
 
       const { data, error } = await supabase
         .from('propiedades')
@@ -439,15 +451,18 @@ export default function HomePropiedad() {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        logger.error('Error de Supabase al duplicar:', error)
+        throw error
+      }
 
-      toast.success('Propiedad duplicada correctamente')
+      toast.success('✅ Propiedad duplicada correctamente')
       setShowDuplicarModal(false)
       setNombreDuplicado('')
-      router.push(`/dashboard/propiedad/${data.id}/home`)
+      router.push(`/dashboard/catalogo/propiedad/${data.id}/home`)
     } catch (error: any) {
       logger.error('Error al duplicar propiedad:', error)
-      toast.error('Error al duplicar la propiedad')
+      toast.error(`❌ Error al duplicar: ${error.message || 'Error desconocido'}`)
     } finally {
       setDuplicando(false)
     }
@@ -1073,6 +1088,25 @@ export default function HomePropiedad() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Editar */}
+      {showWizard && (
+        <WizardModal
+          isOpen={showWizard}
+          onClose={() => setShowWizard(false)}
+          mode="edit"
+          propertyId={propiedadId}
+          onComplete={async (propertyId) => {
+            console.log('🎉 Propiedad actualizada con ID:', propertyId);
+
+            // Recargar datos de la propiedad
+            await cargarPropiedad();
+
+            // Mostrar toast de éxito
+            toast.success('✅ Propiedad actualizada exitosamente');
+          }}
+        />
       )}
     </div>
   )

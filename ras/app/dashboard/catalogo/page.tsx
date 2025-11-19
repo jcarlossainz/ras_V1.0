@@ -33,6 +33,8 @@ export default function CatalogoPage() {
   const [showWizard, setShowWizard] = useState(false)
   const [showCompartir, setShowCompartir] = useState(false)
   const [propiedadSeleccionada, setPropiedadSeleccionada] = useState<Propiedad | null>(null)
+  const [wizardMode, setWizardMode] = useState<'create' | 'edit'>('create')
+  const [wizardPropertyId, setWizardPropertyId] = useState<string | undefined>(undefined)
   
   const [busqueda, setBusqueda] = useState('')
   const [filtroPropiedad, setFiltroPropiedad] = useState<'todos' | 'propios' | 'compartidos'>('todos')
@@ -156,8 +158,10 @@ export default function CatalogoPage() {
   }
 
   const editarPropiedad = (propiedadId: string) => {
-    toast.info('Función de edición en desarrollo')
     logger.log('Editar propiedad:', propiedadId)
+    setWizardMode('edit')
+    setWizardPropertyId(propiedadId)
+    setShowWizard(true)
   }
 
   const eliminarPropiedad = async (propiedadId: string, nombrePropiedad: string) => {
@@ -198,6 +202,8 @@ export default function CatalogoPage() {
 
   const handleCloseWizard = () => {
     setShowWizard(false)
+    setWizardMode('create')
+    setWizardPropertyId(undefined)
   }
 
   const propiedadesFiltradas = propiedades.filter(prop => {
@@ -448,17 +454,18 @@ export default function CatalogoPage() {
         <WizardModal
           isOpen={showWizard}
           onClose={handleCloseWizard}
-          mode="create"
+          mode={wizardMode}
+          propertyId={wizardPropertyId}
           onComplete={async (propertyId) => {
-            console.log('🎉 Propiedad creada con ID:', propertyId);
-            
+            console.log(`🎉 Propiedad ${wizardMode === 'create' ? 'creada' : 'actualizada'} con ID:`, propertyId);
+
             // Recargar lista de propiedades
             if (user?.id) {
               await cargarPropiedades(user.id);
             }
-            
+
             // Mostrar toast de éxito
-            toast.success('✅ Propiedad creada exitosamente');
+            toast.success(`✅ Propiedad ${wizardMode === 'create' ? 'creada' : 'actualizada'} exitosamente`);
           }}
         />
       )}

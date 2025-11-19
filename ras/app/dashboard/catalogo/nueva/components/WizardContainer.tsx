@@ -74,17 +74,29 @@ export default function WizardContainer({
         if (result.success && result.data) {
           setFormData(result.data);
           setPropertyId(initialPropertyId);
-          
+
           // Marcar steps completados basado en wizard_step
           const stepNumber = result.data.wizard_step || 1;
           const completed = new Set<number>();
-          for (let i = 1; i < stepNumber; i++) {
-            completed.add(i);
+
+          // ✅ FIX: Si wizard_step > totalSteps, significa que está completado
+          const actualStep = Math.min(stepNumber, totalSteps);
+
+          // Marcar todos los steps como completados si está finalizado
+          if (stepNumber >= totalSteps) {
+            for (let i = 1; i <= totalSteps; i++) {
+              completed.add(i);
+            }
+          } else {
+            for (let i = 1; i < actualStep; i++) {
+              completed.add(i);
+            }
           }
+
           setCompletedSteps(completed);
-          setCurrentStep(stepNumber);
-          
-          toast.success('✅ Propiedad cargada correctamente');
+          setCurrentStep(actualStep);
+
+          console.log('✅ Propiedad cargada en step:', actualStep);
         } else {
           toast.error(`❌ Error al cargar: ${result.error}`);
         }

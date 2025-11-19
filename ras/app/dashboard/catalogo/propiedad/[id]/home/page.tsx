@@ -342,9 +342,9 @@ export default function HomePropiedad() {
       }
 
       console.log('✅ Propiedad cargada exitosamente:', propData.nombre_propiedad)
-      
+
       const { data: { user: authUser } } = await supabase.auth.getUser()
-      const esPropio = propData.user_id === authUser?.id
+      const esPropio = propData.owner_id === authUser?.id  // ✅ FIX: usar owner_id en lugar de user_id
       
       logger.log('=== DATOS DE PROPIEDAD ===')
       logger.log('Propiedad completa:', propData)
@@ -433,13 +433,12 @@ export default function HomePropiedad() {
 
     try {
       // Excluir campos que no deben duplicarse
-      const { id, created_at, updated_at, es_propio, ...propiedadData } = propiedad as any
+      const { id, created_at, updated_at, es_propio, user_id, ...propiedadData } = propiedad as any
 
       const nuevaPropiedad = {
         ...propiedadData,
         nombre_propiedad: nombreDuplicado,
-        user_id: user.id,
-        owner_id: user.id,
+        owner_id: user.id,  // ✅ FIX: Solo owner_id, no user_id
         wizard_step: 6, // Marcar como completada
       }
 

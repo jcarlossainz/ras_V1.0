@@ -8,6 +8,7 @@ import { useConfirm } from '@/components/ui/confirm-modal'
 import { logger } from '@/lib/logger'
 import WizardModal from './nueva/components/WizardModal'
 import CompartirPropiedad from '@/components/CompartirPropiedad'
+import AñadirCuentaModal from '@/components/AñadirCuentaModal'
 import TopBar from '@/components/ui/topbar'
 import Loading from '@/components/ui/loading'
 import EmptyState from '@/components/ui/emptystate'
@@ -32,8 +33,9 @@ export default function CatalogoPage() {
   const [propiedades, setPropiedades] = useState<Propiedad[]>([])
   const [showWizard, setShowWizard] = useState(false)
   const [showCompartir, setShowCompartir] = useState(false)
+  const [showAñadirCuenta, setShowAñadirCuenta] = useState(false)
   const [propiedadSeleccionada, setPropiedadSeleccionada] = useState<Propiedad | null>(null)
-  
+
   const [busqueda, setBusqueda] = useState('')
   const [filtroPropiedad, setFiltroPropiedad] = useState<'todos' | 'propios' | 'compartidos'>('todos')
 
@@ -234,6 +236,17 @@ export default function CatalogoPage() {
               </svg>
             ),
             onClick: () => setShowWizard(true)
+          },
+          {
+            label: 'Añadir cuenta',
+            icon: (
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2C6.5 2 2 4.5 2 7.5v1C2 11.5 6.5 14 12 14s10-2.5 10-5.5v-1C22 4.5 17.5 2 12 2z"/>
+                <path d="M2 12c0 3 4.5 5.5 10 5.5S22 15 22 12"/>
+                <path d="M2 16.5c0 3 4.5 5.5 10 5.5s10-2.5 10-5.5"/>
+              </svg>
+            ),
+            onClick: () => setShowAñadirCuenta(true)
           }
         ]}
       />
@@ -451,15 +464,27 @@ export default function CatalogoPage() {
           mode="create"
           onComplete={async (propertyId) => {
             console.log('🎉 Propiedad creada con ID:', propertyId);
-            
+
             // Recargar lista de propiedades
             if (user?.id) {
               await cargarPropiedades(user.id);
             }
-            
+
             // Mostrar toast de éxito
             toast.success('✅ Propiedad creada exitosamente');
           }}
+        />
+      )}
+
+      {showAñadirCuenta && user && (
+        <AñadirCuentaModal
+          isOpen={showAñadirCuenta}
+          onClose={() => setShowAñadirCuenta(false)}
+          onSuccess={(cuenta) => {
+            console.log('💰 Cuenta creada:', cuenta)
+            setShowAñadirCuenta(false)
+          }}
+          userId={user.id}
         />
       )}
     </div>

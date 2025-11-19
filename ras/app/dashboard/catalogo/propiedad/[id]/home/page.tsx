@@ -311,6 +311,8 @@ export default function HomePropiedad() {
 
   const cargarPropiedad = async () => {
     try {
+      console.log('🔍 Cargando propiedad con ID:', propiedadId)
+
       // Traer todos los datos de la propiedad
       const { data: propData, error } = await supabase
         .from('propiedades')
@@ -318,10 +320,22 @@ export default function HomePropiedad() {
         .eq('id', propiedadId)
         .single()
 
+      console.log('📦 Respuesta de Supabase:', { data: propData, error })
+
       if (error) {
         console.error('❌ Error al cargar propiedad:', error)
+        console.error('   Código:', error.code)
+        console.error('   Mensaje:', error.message)
+        console.error('   Detalles:', error.details)
         throw error
       }
+
+      if (!propData) {
+        console.error('❌ No se encontraron datos para la propiedad')
+        throw new Error('Propiedad no encontrada')
+      }
+
+      console.log('✅ Propiedad cargada exitosamente:', propData.nombre_propiedad)
       
       const { data: { user: authUser } } = await supabase.auth.getUser()
       const esPropio = propData.user_id === authUser?.id
